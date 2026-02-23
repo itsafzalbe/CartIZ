@@ -59,6 +59,18 @@ class Market(models.Model):
 
 
 
+class MarketReview(models.Model):
+    market_id
+    user_id
+    order_id
+    rating
+    comment
+    is_approved
+    created_at
+    updated_at
+
+
+
 
 
 

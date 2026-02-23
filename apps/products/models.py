@@ -3,6 +3,10 @@ from django.core.validators import MinValueValidator, MaxValueValidator, RegexVa
 from stores.models import Market
 from django.utils.text import slugify
 from django.db.models import Q
+from accounts.models import User
+from orders.models import OrderItem
+from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 
 # CATEGORY
@@ -11,6 +15,9 @@ from django.db.models import Q
 # PRODUCT_VARIANT
 # PRODUCT_ATTRIBUTE
 # PRODUCT_ATTRIBUTE_VALUE
+# PRODUCT_REVIEW
+# WISHLIST
+# WISHLIST_ITEM
 
 
 class Category(models.Model):
@@ -81,11 +88,13 @@ class Product(models.Model):
             )
         ]
         indexes = [
+            models.Index(fields=['market', 'is_active']),
+            models.Index(fields=['category', 'is_active']),
             models.Index(fields=['slug']),
+            models.Index(fields=['sku']),
+            models.Index(fields=['created_at']),
             models.Index(fields=['price']),
-            models.Index(fields=['market']),
-            models.Index(fields=['category']),
-            models.Index(fields=['is_active'])
+            models.Index(fields=['is_featured']),
         ]
     
     def __str__(self):
@@ -235,3 +244,133 @@ class ProductAttributeValue(models.Model):
 
 
 
+class ProductReview(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="reviews")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="product_reviews")
+    order_item = models.ForeignKey(OrderItem, on_delete=models.CASCADE, related_name="product_reviews")
+    rating = models.DecimalField(max_digits=3, decimal_places=2, validators=[MinValueValidator(1), MaxValueValidator(5)], help_text="Star rating (1-5)")
+    title = models.CharField(max_length=255, null=True, blank=True, help_text="Review title")
+    comment = models.TextField(null=True, blank=True, help_text="Review text")
+    is_verified_purchase = models.BooleanField(default=False, help_text="Verified buyer flag")
+    is_approved = models.BooleanField(default=False, help_text="Moderation status")
+    helpful_count = models.PositiveIntegerField(default=0, help_text="Helpful votes")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="Review submission time")
+    updated_at = models.DateTimeField(auto_now=True, help_text="Last edit time")
+
+    class Meta:
+        db_table = "product_reviews"
+        verbose_name = "Product Review"
+        verbose_name_plural = "Product Reviews"
+        indexes = [
+            models.Index(fields=['product']),
+            models.Index(fields=['user']),
+            models.Index(fields=['rating']),
+            models.Index(fields=['is_approved']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['order_item'],
+                name="one_review_per_order_item"
+            )
+        ]
+
+    def clean(self):
+        if self.order_item.product_id != self.product_id:
+            raise ValidationError("Order item does not match product.")
+        
+        if self.order_item.order.user_id != self.user_id:
+            raise ValidationError("You can only review your own purchases.")
+        
+        if not self.title and not self.comment:
+            raise ValidationError("Review must contain a title or comment")
+        
+    def save(self, *args, **kwargs):
+        if self.order_item:
+            self.is_verified_purchase = bool(self.order_item_id)
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class Wishlist(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="wishlists", help_text="Wishlist owner")
+    name = models.CharField(max_length=200, help_text="Wishlist name")
+    is_public = models.BooleanField(default=False, help_text="Public visibility")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="Creation timestamp")
+    updated_at = models.DateTimeField(auto_now=True, help_text="Last update timestamp")
+
+    class Meta:
+        db_table = "wishlists"
+        verbose_name = "Wishlist"
+        verbose_name_plural = "Wishlists"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'name'],
+                name="unique_wishlist_name_per_user"
+            )
+        ]
+    
+    def save(self, *args, **kwargs):
+        if self.name:
+            base_name = self.name.strip().title()
+        else:
+            base_name = "My Wishlist"
+        
+        name = base_name
+        counter = 1
+
+        while Wishlist.objects.filter(user=self.user, name=name).exclude(pk=self.pk).exists():
+            name = f"{base_name} ({counter})"
+            counter += 1
+        
+        self.name = name
+        super().save(*args, **kwargs)
+
+
+class WishlistItem(models.Model):
+    wishlist = models.ForeignKey(Wishlist, on_delete=models.CASCADE, related_name="items", help_text="Parent wishlist")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="wishlist_entries", help_text="Saved product")
+    variant = models.ForeignKey(ProductVariant, null=True, blank=True, on_delete=models.PROTECT, related_name="wishlist_variant_entries", help_text="Specific variant")
+    notes = models.TextField(null=True, blank=True, help_text="User notes")
+    added_at = models.DateTimeField(auto_now_add=True, help_text="When item was added")
+
+    class Meta:
+        db_table = "wishlist_items"
+        verbose_name = "Wishlist Item"
+        verbose_name_plural = "Wishlist Items"
+        ordering = ['-added_at']
+        indexes = [
+            models.Index(fields=['wishlist']),
+            models.Index(fields=['product']),
+            models.Index(fields=['variant']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['wishlist', 'variant'],
+                condition=Q(variant__isnull=False),
+                name="unique_variant_per_wishlist"
+            ),
+            models.UniqueConstraint(
+                fields=['wishlist', 'product'],
+                condition=Q(variant__isnull=True),
+                name="unique_product_per_wishlist"
+            )
+        ]
+    
+    def clean(self):
+        if not self.product.is_active:
+            raise ValidationError("Cannot add inactive products to the wishlist.")
+        if self.variant and self.variant.product_id != self.product_id:
+            raise ValidationError("Variant does not belong to the selected product.")
+    
+    def __str__(self):
+        return str(self.variant or self.product)
+    
+    def save(self, *args, **kwargs):
+        if self.notes:
+            self.notes = self.notes.strip()
+        self.full_clean()
+        super().save(*args, **kwargs)

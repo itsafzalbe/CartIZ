@@ -5,6 +5,7 @@ from datetime import timedelta
 import time
 from django.utils.timezone import now
 from django.contrib.auth import models, hashers
+from django.core.validators import RegexValidator
 
 class User(models.AbstractUser):
     AUTH_STATUS = (
@@ -13,13 +14,21 @@ class User(models.AbstractUser):
         ('DONE', 'Done')
     )
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    phone_number = models.CharField(max_length=50, null=True)
+    phone_number = models.CharField(max_length=50, validators=[RegexValidator(r'^\+?1?\s*\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}$', 'Enter valid phone number')], null=True)
     date_of_birth = models.DateField(null= True, blank = True,)
     profile_picture = models.ImageField(upload_to="profile_photos/", null = True, blank=True)
     is_seller = models.BooleanField(default=False)
     is_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now = True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['email']),
+            models.Index(fields=['username']),
+            models.Index(fields=['is_seller']),
+            models.Index(fields=['date_joined']),
+        ]
 
     def __str__(self):
         return self.username
@@ -97,7 +106,7 @@ class UserAddress(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE,help_text="owner of address", related_name="user_address")
     address_type = models.CharField(max_length=20, help_text="'shipping', 'billing', 'both'")
     full_name = models.CharField(max_length=200, help_text="Recepient name")
-    phone_number = models.CharField(max_length=20, help_text="Contact phone")
+    phone_number = models.CharField(max_length=20, validators=[RegexValidator(r'^\+?1?\s*\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}$', 'Enter valid phone number')], help_text="Contact phone")
     address_line_1 = models.CharField(max_length=255, help_text="Street address")
     address_line_2 = models.CharField(max_length=255, null=True, blank=True, help_text="Apartment, suite, etc.")
     city = models.CharField(max_length=100, help_text="City name")
