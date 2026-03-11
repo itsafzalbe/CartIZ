@@ -2,6 +2,7 @@ from django.db import models
 from accounts.models import User
 from django.utils.text import slugify
 from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
+from orders.models import Order
 
 
 
@@ -60,14 +61,33 @@ class Market(models.Model):
 
 
 class MarketReview(models.Model):
-    market_id
-    user_id
-    order_id
-    rating
-    comment
-    is_approved
-    created_at
-    updated_at
+    market = models.ForeignKey(Market, on_delete=models.CASCADE, related_name="reviews")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reviews")
+    order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True, blank=True, related_name="reviews")
+    rating = models.DecimalField(max_digits=2, decimal_places=1, validators=[MinValueValidator(1), MaxValueValidator(5)], help_text="Star rating (1-5)")
+    comment = models.TextField(blank=True, null=True, help_text="Review text")
+    is_approved = models.BooleanField(default=False, help_text="Moderation status")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="Review submission time")
+    updated_at = models.DateTimeField(auto_now=True, help_text="Last edit time")
+
+    class Meta:
+        db_table = "market_reviews"
+        verbose_name = "Market Review"
+        verbose_name_plural = "Market Reviews"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["market"]),
+            models.Index(fields=["is_approved"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["order"],
+                name="unique_market_review"
+            )
+        ]
+    
+    def __str__(self):
+        return f"{self.user} review for {self.market}, ({self.rating})"
 
 
 

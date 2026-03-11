@@ -164,16 +164,23 @@ class Payment(models.Model):
         super().save(*args, **kwargs)
 
 
-
-
 class Refund(models.Model):
-    order = models.ForeignKey("app.Model", verbose_name=_(""), on_delete=models.CASCADE)
-    payment = models.ForeignKey("app.Model", verbose_name=_(""), on_delete=models.CASCADE)
-    card = models.ForeignKey("app.Model", verbose_name=_(""), on_delete=models.CASCADE)
-    refund_number = models
-    amount
-    reason
-    status
-    processed_by
-    created_at
-    completed_at
+    PENDING = 'pending'
+    COMPLETED = 'completed'
+    FAILED = 'failed'
+
+    REFUND_STATUS = (
+        (PENDING, 'Pending'),
+        (COMPLETED, 'Completed'),
+        (FAILED, 'Failed'),
+    )
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="refunds")
+    payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name="refunds")
+    card = models.ForeignKey(UserCard, on_delete=models.CASCADE, related_name="refunds")
+    refund_number = models.CharField(max_length=50, unique=True, help_text="Refund reference number")
+    amount = models.DecimalField(max_digits=10, decimal_places=2, help_text="Refund amound")
+    reason = models.TextField(null=True, blank=True, help_text="Reason for refund")
+    status = models.CharField(max_length=10, choices=REFUND_STATUS, help_text="Refund status")
+    processed_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="refunds")
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField()
