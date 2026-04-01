@@ -1,7 +1,7 @@
 from django.db import models
-from accounts.models import User
-from products.models import Product
-from orders.models import Order
+from apps.accounts.models import User
+from apps.products.models import Product
+from apps.orders.models import Order
 import uuid
 # Create your models here.
 

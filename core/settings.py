@@ -43,6 +43,15 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
 
 
+    'apps.accounts.apps.AccountsConfig',
+    'apps.cart.apps.CartConfig',
+    'apps.communications.apps.CommunicationsConfig',
+    'apps.orders.apps.OrdersConfig',
+    'apps.payments.apps.PaymentsConfig',
+    'apps.products.apps.ProductsConfig',
+    'apps.promotions.apps.PromotionsConfig',
+    'apps.stores.apps.StoresConfig',
+
 ]
 
 REST_FRAMEWORK = {

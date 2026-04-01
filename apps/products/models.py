@@ -1,10 +1,10 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
-from stores.models import Market
+from apps.stores.models import Market
 from django.utils.text import slugify
 from django.db.models import Q
-from accounts.models import User
-from orders.models import OrderItem
+from apps.accounts.models import User
+from apps.orders.models import OrderItem
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
@@ -142,7 +142,7 @@ class ProductImage(models.Model):
         verbose_name = "Product Image"
         verbose_name_plural = "Product Images"
         ordering = ['order_position']
-        constraint = [
+        constraints = [
             models.UniqueConstraint(
                 fields=['product'],
                 condition=Q(is_primary=True),

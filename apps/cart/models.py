@@ -1,7 +1,7 @@
 from django.db import models
-from accounts.models import User
+from apps.accounts.models import User
 from django.core.validators import MinValueValidator
-from products.models import *
+from apps.products.models import *
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 
@@ -33,7 +33,7 @@ class CartItem(models.Model):
         verbose_name_plural = "Cart Items"
         ordering = ['-added_at']
         indexes = [
-            models.Index(fields=['cart', 'prod']),
+            models.Index(fields=['cart', 'product']),
             models.Index(fields=['cart', 'variant']),
             models.Index(fields=['product']),
         ]

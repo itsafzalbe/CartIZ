@@ -1,19 +1,20 @@
 from django.db import models
-from uuid import uuid4
+import uuid
 import random
 from datetime import timedelta
 import time
 from django.utils.timezone import now
-from django.contrib.auth import models, hashers
+from django.contrib.auth import hashers
 from django.core.validators import RegexValidator
+from django.contrib.auth.models import AbstractUser
 
-class User(models.AbstractUser):
+class User(AbstractUser):
     AUTH_STATUS = (
         ('NEW', 'New'),
-        ('REGISTERED', 'Registered')
+        ('REGISTERED', 'Registered'),
         ('DONE', 'Done')
     )
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     phone_number = models.CharField(max_length=50, validators=[RegexValidator(r'^\+?1?\s*\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}$', 'Enter valid phone number')], null=True)
     date_of_birth = models.DateField(null= True, blank = True,)
     profile_picture = models.ImageField(upload_to="profile_photos/", null = True, blank=True)
@@ -43,7 +44,7 @@ class User(models.AbstractUser):
         return code
     
     def generate_username(self):
-        return f"user_{uuid4().hex[:8]}"
+        return f"user_{uuid.uuid4().hex[:8]}"
     
     def check_username(self):
         if not self.username:

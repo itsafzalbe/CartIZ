@@ -1,12 +1,10 @@
 from django.db import models
-from accounts.models import User
-from stores.models import Market
-from django.core.validators import MinValueValidator
+from apps.accounts.models import User
+from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
 from django.db.models import GenericIPAddressField, Q
 from django.core.exceptions import ValidationError
 from decimal import Decimal
 from django.utils import timezone
-from products.models import *
 
 # ORDER
 # ORDER_ITEM
@@ -47,7 +45,7 @@ class Order(models.Model):
     )
     order_number = models.CharField(max_length=50, unique=True, help_text="Human-readable order number")
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="orders")
-    market = models.ForeignKey(Market, on_delete=models.PROTECT, related_name="orders")
+    market = models.ForeignKey("stores.Market", on_delete=models.PROTECT, related_name="orders")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=ORDER_PENDING)
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)], help_text="Items total")
@@ -106,12 +104,10 @@ class Order(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
 
-
-
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="order_items")
-    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="order_items")
-    variant = models.ForeignKey(ProductVariant, on_delete=models.PROTECT, null=True, blank=True, related_name="order_items")
+    product = models.ForeignKey("products.Product", on_delete=models.PROTECT, related_name="order_items")
+    variant = models.ForeignKey("products.ProductVariant", on_delete=models.PROTECT, null=True, blank=True, related_name="order_items")
     product_name = models.CharField(max_length=255, help_text="Product name at purchase")
     variant_name = models.CharField(max_length=255, null=True, blank=True, help_text="Variant details" )
     sku = models.CharField(max_length=100, help_text="SKU at purchase")
@@ -144,7 +140,7 @@ class OrderItem(models.Model):
                 name="unique_product_per_order"
             ),
             models.CheckConstraint(
-                check=Q(total__gte=0),
+                condition=Q(total__gte=0),
                 name="orderitem_total_non_negative" 
             ),
         ]
@@ -169,12 +165,6 @@ class OrderItem(models.Model):
         self.total = (self.subtotal - self.discount + self.tax_amount).quantize(Decimal("0.01"))
         self.full_clean()
         super().save(*args, **kwargs)
-
-        
-
-
-
-
 
 class OrderAddress(models.Model):
     SHIPPING = 'shipping' 
@@ -209,18 +199,13 @@ class OrderAddress(models.Model):
             )
         ]
     
-    def svae(self, *args, **kwargs):
+    def save(self, *args, **kwargs):
         if self.full_name:
             self.full_name = self.full_name.strip().title()
         super().save(*args, **kwargs)
 
-
-
-
-
-
 class ShippingMethod(models.Model):
-    market = models.ForeignKey(Market, on_delete=models.CASCADE, related_name="shipping_methods")
+    market = models.ForeignKey("stores.Market", on_delete=models.CASCADE, related_name="shipping_methods")
     name = models.CharField(max_length=200, help_text="Method name")
     description = models.TextField(null=True, blank=True, help_text="Method description")
     cost = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)], help_text="Shipping cost")
@@ -254,9 +239,6 @@ class ShippingMethod(models.Model):
             self.name = self.name.strip().title()
         self.full_clean()
         super().save(*args, **kwargs)
-
-    
-
 
 class OrderShipping(models.Model):
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="shipping")

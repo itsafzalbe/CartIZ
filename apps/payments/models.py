@@ -3,8 +3,9 @@ from apps.accounts.models import *
 from django.utils.timezone import now
 from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
 from django.db.models import Q
-from orders.models import Order
+from apps.orders.models import Order
 from django.core.exceptions import ValidationError
+import uuid
 
 # USER_CARD
 # CARD_TRANSACTION
@@ -176,11 +177,35 @@ class Refund(models.Model):
     )
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="refunds")
     payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name="refunds")
-    card = models.ForeignKey(UserCard, on_delete=models.CASCADE, related_name="refunds")
-    refund_number = models.CharField(max_length=50, unique=True, help_text="Refund reference number")
-    amount = models.DecimalField(max_digits=10, decimal_places=2, help_text="Refund amound")
+    card = models.ForeignKey(UserCard, on_delete=models.SET_NULL, null=True, blank=True, related_name="refunds")
+    refund_number = models.CharField(max_length=50, unique=True, editable=False, help_text="Refund reference number")
+    amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)], help_text="Refund amount")
     reason = models.TextField(null=True, blank=True, help_text="Reason for refund")
-    status = models.CharField(max_length=10, choices=REFUND_STATUS, help_text="Refund status")
-    processed_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="refunds")
+    status = models.CharField(max_length=10, choices=REFUND_STATUS, default=PENDING, help_text="Refund status")
+    processed_by = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name="processed_refunds")
     created_at = models.DateTimeField(auto_now_add=True)
-    completed_at = models.DateTimeField()
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "refunds"
+        verbose_name = "Refund"
+        verbose_name_plural = "Refunds"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["order"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["created_at"]),
+        ]
+    
+    def __str__(self):
+        return f"Refund {self.refund_number} - {self.get_status_display()}"
+    
+    def clean(self):
+        if self.amount > self.payment.amount:
+            raise ValidationError("Refund amount cannot exceed payment amount")
+
+    def save(self, *args, **kwargs):
+        if not self.refund_number:
+            self.refund_number = f"RF-{uuid.uuid4().hex[:8].upper()}"
+        super().save(*args, **kwargs)
+    
