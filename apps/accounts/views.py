@@ -1,3 +1,436 @@
-from django.shortcuts import render
+"""
+views.py — Authentication & account management
+===============================================
+All views follow a consistent response envelope:
 
-# Create your views here.
+  Success 2xx
+  {
+      "status":  "success",
+      "message": "...",
+      "data":    { ... }   ← omitted when there is nothing to return
+  }
+
+  Error 4xx
+  {
+      "status": "error",
+      "errors": { field: [msg, ...], non_field_errors: [...] }
+  }
+"""
+
+
+import os
+import urllib.parse
+
+from django.shortcuts import redirect
+from django.utils import timezone
+
+from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
+from rest_framework.views import APIView
+
+from .models import *
+from .serializers import *
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Response helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def success(message: str, data: dict = None, http_status = status.HTTP_200_OK) -> Response:
+    body = {"status": "success", "message": message}
+    if data is not None:
+        body["data"] = data
+    return Response(body, status=http_status)
+
+def created(message: str, data: dict=None) -> Response:
+    return success(message, data, http_status=status.HTTP_201_CREATED)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Custom throttles
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+
+class AuthRateThrottle(AnonRateThrottle):
+    """10 requests / hour for sensitive auth endpoints."""
+    scope = "auth"
+    rate = "10/hour"
+
+class OTPRateThrottle(AnonRateThrottle):
+    """5 OTP requests / hour per IP."""
+    scope = "otp"
+    rate = "5/hour"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 1 — Submit email
+# ─────────────────────────────────────────────────────────────────────────────
+class RegisterEmailView(APIView):
+    """
+    POST /auth/register/
+    Body: { "email": "user@example.com"}
+    
+    Sends a 5-digit OTP to the provided address
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [AuthRateThrottle]
+
+    def post(self, request):
+        serializer = UserRegistrationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return success(
+            "A verification code has been sent to your email address",
+            data={"email": user.email},
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 2 — Verify OTP
+# ─────────────────────────────────────────────────────────────────────────────
+class VerifyEmailView(APIView):
+    """
+    POST /auth/verify-email/
+    Body: { "email": "user@example.com", "code": "12345" }
+    
+    On success advances auth_status to REGISTERED and returns the user_id
+    the client needs for the complete-profile step.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [OTPRateThrottle]
+
+    def post(self, request):
+        serializer = EmailVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return success(
+            "Email verified. Please complete your profile.",
+            data = {
+                "user_id":     str(user.pk),
+                "auth_status": user.auth_status,
+            },
+        )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Resend OTP
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ResendOTPView(APIView):
+    """
+    POST /auth/resend-otp/
+    Body: { "email": "user@example.com" }
+
+    60-second cooldown enforced. Returns seconds_remaining so the frontend
+    can display a countdown timer. 
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [OTPRateThrottle]
+
+    def post(self, request):
+        serializer = ResendVerificationEmailSerializer(data = request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return success(
+            "A new verification code has been sent to your email address.",
+            data = {"resend_after_seconds": serializer.seconds_until_next},
+        )
+    
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 3 — Complete profile
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CompleteProfileView(APIView):
+    """
+    PATCH /auth/complete-profile/<user_id>/
+    Body: { "username", "first_name", "last_name", "password", "password_confirm", ... }
+    
+    Finalises registration (auth_status → DONE) and immediately issues
+    JWT tokens so the user lands on the dashboard without a second login.
+    """
+
+    permission_classes = [AllowAny]
+
+    def patch(self, request, user_id):
+        try:
+            user = User.objects.get(pk=user_id, auth_status="REGISTERED")
+        except User.DoesNotExist:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "User not found or profile setup already completed."
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = CompleteProfileSerializer(user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        from rest_framework_simplejwt.tokens import RefreshToken
+        refresh = RefreshToken.for_user(user)
+
+        return success(
+            "Account created successfully. Welcome!",
+            data = {
+                "auth_status": user.auth_status,
+                "refresh":     str(refresh),
+                "access":      str(refresh.access_token),
+            }, http_status=status.HTTP_201_CREATED,
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Login
+# ─────────────────────────────────────────────────────────────────────────────
+class LoginView(APIView):
+    """
+    POST /auth/login/
+    Body: { "email": "user@example.com", "password": "SecretPassword123!" }
+    Return access + refresh JWT tokens. Also captures the client IP for audit purpose.
+    """
+    permission_classes = [AllowAny]
+    throttle_classes = [AuthRateThrottle]
+
+    def post(self, request):
+        serializer = UserLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        tokens = serializer.get_tokens()
+        user   = serializer.validated_data["_user"]
+
+        # persist login IP
+        xff = request.META.get("HTTP_X_FORWARDED_FOR")
+        ip = xff.split(",")[0].strip() if xff else request.META.get("REMOTE_ADDR")
+        user.last_login_ip = ip
+        user.save(update_fields=["last_login_ip"])
+
+        return success(
+            "Logged in successfully.",
+            data={
+                **tokens,
+                "user": {
+                    "id":           str(user.pk), 
+                    "email":        user.email,
+                    "username":     user.username,
+                    "first_name":   user.first_name,
+                    "last_name":    user.last_name,
+                    "auth_status":  user.auth_status,
+                    "is_seller":    user.is_seller,
+                    "avatar_url":   user.get_avatar_url(),
+                },
+            },
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Logout
+# ─────────────────────────────────────────────────────────────────────────────
+class LogoutView(APIView):
+    """
+    POST /auth/logout/
+    Body: { "refresh": "<refresh_token>" }
+    
+    Blacklist the refresh token. The short-lived access token will expire
+    on its own; frontends should discard it immediately
+    """
+
+    permission_classes = [IsAuthenticated]
+
+
+    def post(self, request):
+        serializer = UserLogoutSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return success("Logged out successfully.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Token refresh
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TokenRefreshView(APIView):
+    """
+    POST /auth/token/refresh/
+    Body: { "refresh": <refresh_token> }
+    
+    Returns a new access token (and rotated refresh if configured).
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RefreshTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return success("Token refreshed.", data=serializer.get_tokens())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Password — change
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PasswordChangeView(APIView):
+    """
+    POST /auth/password/change/
+    Body: { "old_password", "new_password", "new_password_confirm" }
+    Requires: Bearer token
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = PasswordChangeSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return success("Password changed successfully.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Password — reset request
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PasswordResetRequestView(APIView):
+    """
+    POST /auth/password/reset/
+    Body: { "email": "user@example.com" }
+
+    Always 200 — the client cannot tell whether the address exists.
+    """
+    permission_classes = [AllowAny]
+    throttle_classes   = [OTPRateThrottle]
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return success(
+            "If that email address is registered you will receive a reset link shortly."
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Password — reset confirm
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PasswordResetConfirmView(APIView):
+    """
+    POST /auth/password/reset/confirm/
+    Body: { "uid", "token", "new_password", "new_password_confirm" }
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return success("Password reset successfully. You can now log in.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Google OAuth — SPA / mobile
+# ─────────────────────────────────────────────────────────────────────────────
+
+class GoogleOAuthView(APIView):
+    """
+    POST /auth/google/
+    Body: { "id_token": "<google_id_token>" }
+
+    For React Native / SPA clients that handle the Google sign-in flow
+    themselves and send the resulting ID token to the backend.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = GoogleOAuthSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = serializer.save()
+
+        http_status = status.HTTP_201_CREATED if result["created"] else status.HTTP_200_OK
+        message     = "Account created via Google." if result["created"] else "Logged in via Google."
+
+        return success(message, data=result, http_status=http_status)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Google OAuth — server-side redirect
+# ─────────────────────────────────────────────────────────────────────────────
+
+class GoogleOAuthRedirectView(APIView):
+    """
+    GET /auth/google/redirect/
+
+    Builds the Google consent URL and redirects the browser.
+    Use this for traditional server-rendered or backend-driven OAuth flows.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        params = urllib.parse.urlencode(
+            {
+                "client_id":     os.environ.get("GOOGLE_CLIENT_ID", ""),
+                "redirect_uri":  os.environ.get(
+                    "GOOGLE_REDIRECT_URI",
+                    "http://localhost:8000/auth/google/callback/",
+                ),
+                "response_type": "code",
+                "scope":         "openid email profile",
+                "access_type":   "offline",
+                "prompt":        "select_account",
+            }
+        )
+        return redirect(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
+
+
+class GoogleOAuthCallbackView(APIView):
+    """
+    POST /auth/google/callback/
+    Body: { "code": "<auth_code>", "redirect_uri": "..." }
+
+    The frontend/backend POSTs here after Google redirects back with a code.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = GoogleOAuthCallbackSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = serializer.save()
+
+        http_status = status.HTTP_201_CREATED if result["created"] else status.HTTP_200_OK
+        message     = "Account created via Google." if result["created"] else "Logged in via Google."
+
+        return success(message, data=result, http_status=http_status)
