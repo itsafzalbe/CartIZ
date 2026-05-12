@@ -29,6 +29,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
+from rest_framework.parsers import MultiPartParser, FormParser
 
 from .models import *
 from .serializers import *
@@ -65,7 +66,7 @@ class OTPRateThrottle(AnonRateThrottle):
     rate = "5/hour"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 1 — Submit email
+# Step 1 — Submit email => tested 
 # ─────────────────────────────────────────────────────────────────────────────
 class RegisterEmailView(APIView):
     """
@@ -89,7 +90,7 @@ class RegisterEmailView(APIView):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 2 — Verify OTP
+# Step 2 — Verify OTP => tested
 # ─────────────────────────────────────────────────────────────────────────────
 class VerifyEmailView(APIView):
     """
@@ -116,7 +117,7 @@ class VerifyEmailView(APIView):
         )
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Resend OTP
+# Resend OTP => tested
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ResendOTPView(APIView):
@@ -142,7 +143,7 @@ class ResendOTPView(APIView):
     
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 3 — Complete profile
+# Step 3 — Complete profile => tested
 # ─────────────────────────────────────────────────────────────────────────────
 
 class CompleteProfileView(APIView):
@@ -185,7 +186,7 @@ class CompleteProfileView(APIView):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Login
+# Login => tested
 # ─────────────────────────────────────────────────────────────────────────────
 class LoginView(APIView):
     """
@@ -228,7 +229,7 @@ class LoginView(APIView):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Logout
+# Logout => tested
 # ─────────────────────────────────────────────────────────────────────────────
 class LogoutView(APIView):
     """
@@ -250,7 +251,7 @@ class LogoutView(APIView):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Token refresh
+# Token refresh => tested
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TokenRefreshView(APIView):
@@ -269,39 +270,9 @@ class TokenRefreshView(APIView):
         return success("Token refreshed.", data=serializer.get_tokens())
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ─────────────────────────────────────────────────────────────────────────────
-# Password — change
+# Password — change => tested
 # ─────────────────────────────────────────────────────────────────────────────
-
 class PasswordChangeView(APIView):
     """
     POST /auth/password/change/
@@ -311,28 +282,25 @@ class PasswordChangeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = PasswordChangeSerializer(
-            data=request.data,
-            context={"request": request},
-        )
+        serializer = PasswordChangeSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return success("Password changed successfully.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Password — reset request
+# Password — reset request => not tested
 # ─────────────────────────────────────────────────────────────────────────────
-
 class PasswordResetRequestView(APIView):
     """
     POST /auth/password/reset/
     Body: { "email": "user@example.com" }
-
-    Always 200 — the client cannot tell whether the address exists.
+    
+    Always 200 - the client cannot tell whether the address exists.
     """
+
     permission_classes = [AllowAny]
-    throttle_classes   = [OTPRateThrottle]
+    throttle_classes = [OTPRateThrottle]
 
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
@@ -344,7 +312,7 @@ class PasswordResetRequestView(APIView):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Password — reset confirm
+# Password — reset confirm => not tested
 # ─────────────────────────────────────────────────────────────────────────────
 
 class PasswordResetConfirmView(APIView):
@@ -352,85 +320,338 @@ class PasswordResetConfirmView(APIView):
     POST /auth/password/reset/confirm/
     Body: { "uid", "token", "new_password", "new_password_confirm" }
     """
+
     permission_classes = [AllowAny]
 
     def post(self, request):
-        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer = PasswordResetConfirmSerializer(data = request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return success("Password reset successfully. You can now log in.")
+    
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Google OAuth — SPA / mobile
-# ─────────────────────────────────────────────────────────────────────────────
 
-class GoogleOAuthView(APIView):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# # ─────────────────────────────────────────────────────────────────────────────
+# # Google OAuth — SPA / mobile
+# # ─────────────────────────────────────────────────────────────────────────────
+
+# class GoogleOAuthView(APIView):
+#     """
+#     POST /auth/google/
+#     Body: { "id_token": "<google_id_token>" }
+
+#     For React Native / SPA clients that handle the Google sign-in flow
+#     themselves and send the resulting ID token to the backend.
+#     """
+#     permission_classes = [AllowAny]
+
+#     def post(self, request):
+#         serializer = GoogleOAuthSerializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#         result = serializer.save()
+
+#         http_status = status.HTTP_201_CREATED if result["created"] else status.HTTP_200_OK
+#         message     = "Account created via Google." if result["created"] else "Logged in via Google."
+
+#         return success(message, data=result, http_status=http_status)
+
+
+# # ─────────────────────────────────────────────────────────────────────────────
+# # Google OAuth — server-side redirect
+# # ─────────────────────────────────────────────────────────────────────────────
+
+# class GoogleOAuthRedirectView(APIView):
+#     """
+#     GET /auth/google/redirect/
+
+#     Builds the Google consent URL and redirects the browser.
+#     Use this for traditional server-rendered or backend-driven OAuth flows.
+#     """
+#     permission_classes = [AllowAny]
+
+#     def get(self, request):
+#         params = urllib.parse.urlencode(
+#             {
+#                 "client_id":     os.environ.get("GOOGLE_CLIENT_ID", ""),
+#                 "redirect_uri":  os.environ.get(
+#                     "GOOGLE_REDIRECT_URI",
+#                     "http://localhost:8000/auth/google/callback/",
+#                 ),
+#                 "response_type": "code",
+#                 "scope":         "openid email profile",
+#                 "access_type":   "offline",
+#                 "prompt":        "select_account",
+#             }
+#         )
+#         return redirect(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
+
+
+# class GoogleOAuthCallbackView(APIView):
+#     """
+#     POST /auth/google/callback/
+#     Body: { "code": "<auth_code>", "redirect_uri": "..." }
+
+#     The frontend/backend POSTs here after Google redirects back with a code.
+#     """
+#     permission_classes = [AllowAny]
+
+#     def post(self, request):
+#         serializer = GoogleOAuthCallbackSerializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#         result = serializer.save()
+
+#         http_status = status.HTTP_201_CREATED if result["created"] else status.HTTP_200_OK
+#         message     = "Account created via Google." if result["created"] else "Logged in via Google."
+
+#         return success(message, data=result, http_status=http_status)
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# USER PROFILE VIEWS => tested
+# ═════════════════════════════════════════════════════════════════════════════
+class UserProfileView(APIView):
     """
-    POST /auth/google/
-    Body: { "id_token": "<google_id_token>" }
-
-    For React Native / SPA clients that handle the Google sign-in flow
-    themselves and send the resulting ID token to the backend.
+    GET /accounts/me/
+    Returns the authenticated user's basic profile.
     """
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        serializer = GoogleOAuthSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        result = serializer.save()
-
-        http_status = status.HTTP_201_CREATED if result["created"] else status.HTTP_200_OK
-        message     = "Account created via Google." if result["created"] else "Logged in via Google."
-
-        return success(message, data=result, http_status=http_status)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Google OAuth — server-side redirect
-# ─────────────────────────────────────────────────────────────────────────────
-
-class GoogleOAuthRedirectView(APIView):
-    """
-    GET /auth/google/redirect/
-
-    Builds the Google consent URL and redirects the browser.
-    Use this for traditional server-rendered or backend-driven OAuth flows.
-    """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        params = urllib.parse.urlencode(
-            {
-                "client_id":     os.environ.get("GOOGLE_CLIENT_ID", ""),
-                "redirect_uri":  os.environ.get(
-                    "GOOGLE_REDIRECT_URI",
-                    "http://localhost:8000/auth/google/callback/",
-                ),
-                "response_type": "code",
-                "scope":         "openid email profile",
-                "access_type":   "offline",
-                "prompt":        "select_account",
-            }
-        )
-        return redirect(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
+        serializer = UserProfileSerializer(request.user)
+        return success("Profile retrieved", data=serializer.data)
 
 
-class GoogleOAuthCallbackView(APIView):
+
+
+class UserDetailView(APIView):
     """
-    POST /auth/google/callback/
-    Body: { "code": "<auth_code>", "redirect_uri": "..." }
+    GET /accounts/me/detail/
+    Returns the full profile with nested addresses and seller info
+    """
 
-    The frontend/backend POSTs here after Google redirects back with a code.
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        serializer = UserDetailSerializer(request.user)
+        return success("Full profile retrieved.", data=serializer.data)
+    
+
+
+class UserPublicView(APIView):
+    """
+    GET /accounts/users/<username>/
+    Returns limited public info about any user (for review cards, messaging).
     """
     permission_classes = [AllowAny]
 
-    def post(self, request):
-        serializer = GoogleOAuthCallbackSerializer(data=request.data)
+    def get(self, request, username: str):
+        from django.shortcuts import get_object_or_404
+        user = get_object_or_404(User, username=username, is_active=True)
+        serializer = UserPublicSerializer(user)
+        return success("Public profile retrieved.", data=serializer.data)
+    
+
+class UserUpdateView(APIView):
+    """
+    PATCH /accounts/me/update/
+    Updates multiple profile fields (name, phone, dob, username)
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        serializer = UserUpdateSerializer(request.user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        result = serializer.save()
+        serializer.save()
+        return success("Profile updated.", data=serializer.data)
 
-        http_status = status.HTTP_201_CREATED if result["created"] else status.HTTP_200_OK
-        message     = "Account created via Google." if result["created"] else "Logged in via Google."
 
-        return success(message, data=result, http_status=http_status)
+class UserAvatarUpdateView(APIView):
+    """
+    PATCH /accounts/me/avatar/
+    Accepts multipart/form-data with field 'avatar'.
+    """
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def patch(self, request):
+        serializer = UserAvatarUpdateSerializer(request.user, data=request.data or request.FILES, partial=True, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return success(
+            "Profile picture updated.",
+            data={"avatar_url": user.get_avatar_url()},
+        )
+
+
+class UserDeleteView(APIView):
+    """
+    DELETE /accounts/me/delete/
+    Body: { "password": "...", "hard_delete": false}
+    DEactivates (default) or permanently deletes the account.
+    """
+    permission_classes = [IsAuthenticated]
+    def delete(self, request):
+        serializer = UserDeleteSerializer(data=request.data, context={"request": request},)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return success("Account deleted successfully.")
+
+
+
+class UserStatsView(APIView):
+    """
+    GET /accountc/me/stats/
+    Returns aggregated statistics for the authenticated user.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserStatsSerializer(request.user)
+        return success("Activity retrieved.", data=serializer.data)
+
+
+
+class UserActivityView(APIView):
+    """
+    GET /accounts/me/activity/
+    Returns the user's recent activity feed.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserActivitySerializer(request.user)
+        return success("Acitivity retrieved", data=serializer.data)
+
+# # ═════════════════════════════════════════════════════════════════════════════
+# # ADDRESS VIEWS
+# # ═════════════════════════════════════════════════════════════════════════════
+
+class UserAddressListCreateView(APIView):
+    """
+    GET /accounts/me/addresses/         -> list all addresses
+    POST /accounts/me/addresses/        -> create a new address
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        addresses = request.user.user_address.all()
+        serializer = UserAddressListSerializer(addresses, many=True)
+        return success("Addresses retrieved.", data={"addresses": serializer.data})
+    
+    def post(self, request):
+        serializer = UserAddressCreateSerializer(data=request.data, context={"request": request}, )
+        serializer.is_valid(raise_exception=True)
+        address = serializer.save()
+        return created(
+            "Address created.",
+            data = UserAddressListSerializer(address).data,
+        )
+    
+
+class UserAddressDetailView(APIView):
+    """
+    GET /accounts/me/addresses/<id>/      -> retrieve single address
+    PATCH /accounts/me/addresses/<id>/    -> update address
+    DELETE /accounts/me/addresses/<id>/   -> delete address
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def _get_address(self, request, pk: int) -> UserAddress:
+        try:
+            return request.user.user_address.get(pk=pk)
+        except UserAddress.DoesNotExist:
+            return None
+    
+    def get(self, request, pk: int):
+        address = self._get_address(request, pk)
+        if not address:
+            return Response(
+                {"status": "error", "message": "Address not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return success("Address retrieved.", data=UserAddressSerializer(address).data)
+    
+    def patch(self, request, pk: int):
+        address = self._get_address(request, pk)
+        if not address:
+            return Response(
+                {"status": "error", "message": "Address not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = UserAddressUpdateSerializer(address, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return success("Address updated.", data=UserAddressSerializer(address).data)
+    
+    def delete(self, request, pk: int):
+        serializer = UserAddressDeleteSerializer(
+            data={"address_id": pk},
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return success("Address deleted.")
+ 
+
+
+class SetDefaultAddressView(APIView):
+    """
+    PATCH /accounts/me/addresses/<id>/set-default/
+    Promotes the given address to default, demotes the previous one
+    """
+    parser_classes = [IsAuthenticated]
+
+    def patch(self, request, pk: int):
+        serializer = SetDefaultAddressSerializer(data={"address_id": pk}, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        address = serializer.save()
+        return success("Default address updated.", data=UserAddressSerializer(address).data)
