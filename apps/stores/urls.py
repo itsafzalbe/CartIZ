@@ -78,26 +78,17 @@ urlpatterns = [
     path('my-market/settings/',       MarketSettingsView.as_view(),     name='my-market-settings'),
     path('my-market/verify/',         MarketVerificationView.as_view(), name='my-market-verify'),
     path('my-market/analytics/',      MarketAnalyticsView.as_view(),    name='my-market-analytics'),
-    
-    
+
+    # ── Review detail (static segment 'reviews' before <pk>) ─────────────────
+    path('markets/reviews/<int:pk>/',       MarketReviewDetailView.as_view(),       name='market-review-detail'),
+
+
+    # ── Reviews under a market ────────────────────────────────────────────────
+    path('markets/<int:pk>/reviews/',       MarketReviewListCreateView.as_view(),   name='market-review-list'),
+    path('markets/<int:pk>/reviews/stats/', MarketReviewStatsView.as_view(),        name='market-review-stats'),
+
+    # ── Followers ─────────────────────────────────────────────────────────────
+    # path('markets/<int:pk>/follow/',        MarketFollowView.as_view(),             name='market-follow'),
+    # path('markets/<int:pk>/followers/',     MarketFollowersListView.as_view(),      name='market-followers'),
 
 ]
-
-
-
-
-
-
-# urlpatterns = [
-
-#     # ── Review detail (static segment 'reviews' before <pk>) ─────────────────
-#     path('markets/reviews/<int:pk>/',           MarketReviewDetailView.as_view(), name='market-review-detail'),
-
-#     # ── Reviews under a market ────────────────────────────────────────────────
-#     path('markets/<int:pk>/reviews/',           MarketReviewListCreateView.as_view(), name='market-review-list'),
-#     path('markets/<int:pk>/reviews/stats/',     MarketReviewStatsView.as_view(),      name='market-review-stats'),
-
-#     # ── Followers ─────────────────────────────────────────────────────────────
-#     path('markets/<int:pk>/follow/',            MarketFollowView.as_view(),       name='market-follow'),
-#     path('markets/<int:pk>/followers/',         MarketFollowersListView.as_view(), name='market-followers'),
-# ]

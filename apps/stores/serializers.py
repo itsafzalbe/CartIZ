@@ -559,53 +559,11 @@ class MarketReviewCreateSerializer(serializers.ModelSerializer):
             'comment': {'required': False},
         }
     
-    def validate()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# MARKET REVIEWS
-# ═════════════════════════════════════════════════════════════════════════════
-
-# ─────────────────────────────────────────────────────────────────────────────
-
-class MarketReviewCreateSerializer(serializers.ModelSerializer):
-    """
-    Creates a new market review.
-    POST /stores/markets/<id>/reviews/
-    One review per order enforced at model level.
-    """
-
-    class Meta:
-        model  = MarketReview
-        fields = ['order', 'rating', 'comment']
-        extra_kwargs = {
-            'order':   {'required': True},
-            'comment': {'required': False},
-        }
-
     def validate(self, attrs):
-        user   = self.context['request'].user
-        market = self.context['market']
-        order  = attrs.get('order')
+        user = self.context["request"].user
+        market = self.context["market"]
+        order = attrs.get('order')
 
-        # Order must belong to this user and this market
         if order and order.user_id != user.pk:
             raise serializers.ValidationError(
                 {"order": "You can only review orders that belong to you."}
@@ -619,25 +577,23 @@ class MarketReviewCreateSerializer(serializers.ModelSerializer):
                 "You have already reviewed this market for this order."
             )
         return attrs
-
+    
     def create(self, validated_data):
         return MarketReview.objects.create(
-            market=self.context['market'],
-            user=self.context['request'].user,
+            market=self.context["market"], 
+            user=self.context["request"].user, 
             **validated_data,
         )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-
 class MarketReviewUpdateSerializer(serializers.ModelSerializer):
     """
-    Edits own review (rating and comment only).
+    Edits own review (rating and comment only)
     PATCH /stores/markets/reviews/<id>/
     """
 
     class Meta:
-        model  = MarketReview
+        model = MarketReview
         fields = ['rating', 'comment']
         extra_kwargs = {f: {'required': False} for f in fields}
 
@@ -647,57 +603,49 @@ class MarketReviewUpdateSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-
 class MarketReviewDeleteSerializer(serializers.Serializer):
     """
-    Validates ownership before deletion.
+    Validates ownership before deletion
     DELETE /stores/markets/reviews/<id>/
     """
 
     def validate(self, attrs):
-        review = self.context['review']
-        user   = self.context['request'].user
+        review = self.context["review"]
+        user  = self.context['request'].user
         if review.user_id != user.pk and not user.is_staff:
-            raise serializers.ValidationError(
+            raise serializer.ValidationError(
                 "You can only delete your own reviews."
             )
         return attrs
-
+    
     def save(self):
         self.context['review'].delete()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-
 class MarketReviewListSerializer(serializers.ModelSerializer):
     """
-    Lightweight review list item.
+    Lightweight review list item
     GET /stores/markets/<id>/reviews/
-    """
-    reviewer_name = serializers.SerializerMethodField()
+    """ 
+    reviewer_name = serializer.SerializerMethodField()
 
     class Meta:
-        model  = MarketReview
+        model = MarketReview
         fields = ['id', 'reviewer_name', 'rating', 'comment', 'created_at']
         read_only_fields = fields
-
+    
     def get_reviewer_name(self, obj):
         return obj.user.get_full_name() or obj.user.username
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-
 class MarketReviewStatsSerializer(serializers.Serializer):
     """
-    Rating breakdown for a market's review section.
+    Rating breakdown for a market's review section
     GET /stores/markets/<id>/reviews/stats/
     """
 
     def to_representation(self, instance: Market):
         approved = instance.reviews.filter(is_approved=True)
-        avg      = approved.aggregate(avg=Avg('rating'))['avg'] or 0
+        avg = approved.aggregate(avg=Avg('rating'))['avg'] or 0
         return {
             'total_reviews':    approved.count(),
             'average_rating':   round(float(avg), 2),
@@ -705,123 +653,122 @@ class MarketReviewStatsSerializer(serializers.Serializer):
         }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-
 class MarketReviewDetailSerializer(serializers.ModelSerializer):
     """
-    Full review with user info — for moderation / detail page.
+    Full reveiw with user info - for moderation /detail page
     GET /stores/markets/reviews/<id>/
     """
-    reviewer_name   = serializers.SerializerMethodField()
+
+    reviewer_name = serializers.SerializerMethodField()
     reviewer_avatar = serializers.SerializerMethodField()
-    reviewer_email  = serializers.SerializerMethodField()
-    order_number    = serializers.SerializerMethodField()
+    reviewer_email = serializers.SerializerMethodField()
+    order_number = serializers.SerializerMethodField()
 
     class Meta:
-        model  = MarketReview
+        model = MarketReview
         fields = [
             'id', 'reviewer_name', 'reviewer_avatar', 'reviewer_email',
-            'order_number', 'rating', 'comment',
+            'order_number', 'rating', 'comment', 
             'is_approved', 'created_at', 'updated_at',
         ]
         read_only_fields = fields
-
+    
     def get_reviewer_name(self, obj):
         return obj.user.get_full_name() or obj.user.username
-
+    
     def get_reviewer_avatar(self, obj):
         return obj.user.get_avatar_url()
-
+    
     def get_reviewer_email(self, obj):
-        # Only expose to staff
+        # only staff can see
         request = self.context.get('request')
         if request and request.user.is_staff:
             return obj.user.email
         return None
-
+    
     def get_order_number(self, obj):
         return obj.order.order_number if obj.order else None
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# MARKET FOLLOWERS
-# Note: These serializers are implemented using a simple in-memory pattern.
-# When you add a MarketFollower model, swap the placeholder logic below.
-# ═════════════════════════════════════════════════════════════════════════════
+# # ═════════════════════════════════════════════════════════════════════════════
+# # MARKET FOLLOWERS
+# # Note: These serializers are implemented using a simple in-memory pattern.
+# # When you add a MarketFollower model, swap the placeholder logic below.
+# # ═════════════════════════════════════════════════════════════════════════════
 
-class MarketFollowerSerializer(serializers.Serializer):
-    """
-    Single follower record.
-    Shape: { user_id, username, avatar_url, followed_at }
-    Plug in real data once MarketFollower model exists.
-    """
-    user_id     = serializers.IntegerField()
-    username    = serializers.CharField()
-    avatar_url  = serializers.CharField(allow_null=True)
-    followed_at = serializers.DateTimeField()
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-
-class FollowMarketSerializer(serializers.Serializer):
-    """
-    Follows a market.
-    POST /stores/markets/<id>/follow/
-    """
-
-    def validate(self, attrs):
-        # Replace with: if MarketFollower.objects.filter(...).exists(): raise
-        return attrs
-
-    def save(self):
-        # Replace with: MarketFollower.objects.get_or_create(user=..., market=...)
-        pass
+# class MarketFollowerSerializer(serializers.Serializer):
+#     """
+#     Single follower record.
+#     Shape: { user_id, username, avatar_url, followed_at }
+#     Plug in real data once MarketFollower model exists.
+#     """
+#     user_id     = serializers.IntegerField()
+#     username    = serializers.CharField()
+#     avatar_url  = serializers.CharField(allow_null=True)
+#     followed_at = serializers.DateTimeField()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# # ─────────────────────────────────────────────────────────────────────────────
 
-class UnfollowMarketSerializer(serializers.Serializer):
-    """
-    Unfollows a market.
-    DELETE /stores/markets/<id>/follow/
-    """
+# class FollowMarketSerializer(serializers.Serializer):
+#     """
+#     Follows a market.
+#     POST /stores/markets/<id>/follow/
+#     """
 
-    def save(self):
-        # Replace with: MarketFollower.objects.filter(user=..., market=...).delete()
-        pass
+#     def validate(self, attrs):
+#         # Replace with: if MarketFollower.objects.filter(...).exists(): raise
+#         return attrs
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-
-class MarketFollowersListSerializer(serializers.Serializer):
-    """
-    Lists all followers of a market.
-    GET /stores/markets/<id>/followers/
-    Returns a placeholder until MarketFollower model is added.
-    """
-
-    def to_representation(self, instance: Market):
-        return {
-            'market':         instance.market_name,
-            'follower_count': 0,   # replace with instance.followers.count()
-            'followers':      [],  # replace with MarketFollowerSerializer(qs, many=True).data
-        }
+#     def save(self):
+#         # Replace with: MarketFollower.objects.get_or_create(user=..., market=...)
+#         pass
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# # ─────────────────────────────────────────────────────────────────────────────
 
-class FollowedMarketsSerializer(serializers.ModelSerializer):
-    """
-    Markets the authenticated user is following.
-    GET /stores/markets/following/
-    Returns the same shape as MarketListSerializer.
-    """
-    logo_url = serializers.SerializerMethodField()
+# class UnfollowMarketSerializer(serializers.Serializer):
+#     """
+#     Unfollows a market.
+#     DELETE /stores/markets/<id>/follow/
+#     """
 
-    class Meta:
-        model  = Market
-        fields = ['id', 'market_name', 'slug', 'logo_url', 'is_verified', 'rating_average']
-        read_only_fields = fields
+#     def save(self):
+#         # Replace with: MarketFollower.objects.filter(user=..., market=...).delete()
+#         pass
 
-    def get_logo_url(self, obj):
-        return obj.logo.url if obj.logo else None
+
+# # ─────────────────────────────────────────────────────────────────────────────
+
+# class MarketFollowersListSerializer(serializers.Serializer):
+#     """
+#     Lists all followers of a market.
+#     GET /stores/markets/<id>/followers/
+#     Returns a placeholder until MarketFollower model is added.
+#     """
+
+#     def to_representation(self, instance: Market):
+#         return {
+#             'market':         instance.market_name,
+#             'follower_count': 0,   # replace with instance.followers.count()
+#             'followers':      [],  # replace with MarketFollowerSerializer(qs, many=True).data
+#         }
+
+
+# # ─────────────────────────────────────────────────────────────────────────────
+
+# class FollowedMarketsSerializer(serializers.ModelSerializer):
+#     """
+#     Markets the authenticated user is following.
+#     GET /stores/markets/following/
+#     Returns the same shape as MarketListSerializer.
+#     """
+#     logo_url = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model  = Market
+#         fields = ['id', 'market_name', 'slug', 'logo_url', 'is_verified', 'rating_average']
+#         read_only_fields = fields
+
+#     def get_logo_url(self, obj):
+#         return obj.logo.url if obj.logo else None

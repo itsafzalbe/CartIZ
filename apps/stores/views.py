@@ -439,36 +439,13 @@ class TrendinMarketsView(APIView):
         serializer = TrendingMarketsSerializer(markets, many=True)
         return ok("Trending markets retrieved.", data={"markets": serializer.data})
     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ═════════════════════════════════════════════════════════════════════════════
 # MARKET REVIEWS
 # ═════════════════════════════════════════════════════════════════════════════
-
 class MarketReviewListCreateView(APIView):
     """
-    GET  /stores/markets/<pk>/reviews/        → list approved reviews
-    POST /stores/markets/<pk>/reviews/        → create review (auth required)
+    GET /stores/markets/<pk>/reviews/           -> list approved reviews
+    POST /stores/markets/<pk>/reviews/          -> create reveiw (auth required)
     """
 
     def get_permissions(self):
@@ -480,14 +457,13 @@ class MarketReviewListCreateView(APIView):
         market = _get_active_market(pk)
         if not market:
             return not_found("Market not found.")
-
-        reviews    = market.reviews.filter(is_approved=True).order_by('-created_at')
-        serializer = MarketReviewListSerializer(reviews, many=True)
+        reviews = market.reveiws.filter(is_approved=True).order_by('-created_at')
+        serializer = MarketReviewSerializer(reviews, many=True)
         return ok("Reviews retrieved.", data={
-            "count":   reviews.count(),
+            "count": reviews.count(),
             "reviews": serializer.data,
         })
-
+    
     def post(self, request, pk: int):
         market = _get_active_market(pk)
         if not market:
@@ -501,15 +477,14 @@ class MarketReviewListCreateView(APIView):
         review = serializer.save()
         return created(
             "Review submitted. It will appear after approval.",
-            data=MarketReviewSerializer(review).data,
+            data = MarketReviewSerializer(review).data,
         )
-
-
-class MarketReviewDetailView(APIView):
+    
+class MarketReviewDetailSerializer(APIView):
     """
-    GET    /stores/markets/reviews/<pk>/     → full review detail
-    PATCH  /stores/markets/reviews/<pk>/     → edit own review
-    DELETE /stores/markets/reviews/<pk>/     → delete own review
+    GET     /stores/markets/reviews/<pk>/   -> fill review detail
+    PATCH   /stores/markets/reviews/<pk>/   -> edit own review
+    DELETE  /stores/markets/reviews/<pk>/   -> delete own review
     """
 
     def get_permissions(self):
@@ -517,11 +492,11 @@ class MarketReviewDetailView(APIView):
             return [AllowAny()]
         return [IsAuthenticated()]
 
-    def _get_review(self, pk):
-        try:
-            return MarketReview.objects.select_related('user', 'market', 'order').get(pk=pk)
-        except MarketReview.DoesNotExist:
-            return None
+        def _get_review(self, pk):
+            try:
+                return MarketReview.objects.select_related('user', 'market', 'order').get(pk=pk)\
+            except MarketReview.DoesNotExist:
+                return None
 
     def get(self, request, pk: int):
         review = self._get_review(pk)
@@ -529,14 +504,15 @@ class MarketReviewDetailView(APIView):
             return not_found("Review not found.")
         serializer = MarketReviewDetailSerializer(review, context={"request": request})
         return ok("Review retrieved.", data=serializer.data)
-
+    
     def patch(self, request, pk: int):
         review = self._get_review(pk)
+
         if not review:
             return not_found("Review not found.")
         if review.user_id != request.user.pk:
             return forbidden("You can only edit your own reviews.")
-
+        
         serializer = MarketReviewUpdateSerializer(review, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         review = serializer.save()
@@ -544,7 +520,7 @@ class MarketReviewDetailView(APIView):
 
     def delete(self, request, pk: int):
         review = self._get_review(pk)
-        if not review:
+        if not reveiw:
             return not_found("Review not found.")
         serializer = MarketReviewDeleteSerializer(
             data={},
@@ -560,6 +536,7 @@ class MarketReviewStatsView(APIView):
     GET /stores/markets/<pk>/reviews/stats/
     Rating breakdown for a market's review section.
     """
+
     permission_classes = [AllowAny]
 
     def get(self, request, pk: int):
@@ -568,76 +545,88 @@ class MarketReviewStatsView(APIView):
             return not_found("Market not found.")
         serializer = MarketReviewStatsSerializer(market)
         return ok("Review stats retrieved.", data=serializer.data)
+        
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# MARKET FOLLOWERS
-# Note: placeholder views — swap body for real logic once MarketFollower
-# model is added.
-# ═════════════════════════════════════════════════════════════════════════════
-
-class MarketFollowView(APIView):
-    """
-    POST   /stores/markets/<pk>/follow/     → follow
-    DELETE /stores/markets/<pk>/follow/     → unfollow
-    """
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, pk: int):
-        market = _get_active_market(pk)
-        if not market:
-            return not_found("Market not found.")
-
-        serializer = FollowMarketSerializer(
-            data={},
-            context={"request": request, "market": market},
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return ok(f"You are now following {market.market_name}.")
-
-    def delete(self, request, pk: int):
-        market = _get_active_market(pk)
-        if not market:
-            return not_found("Market not found.")
-
-        serializer = UnfollowMarketSerializer(
-            data={},
-            context={"request": request, "market": market},
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return ok(f"You have unfollowed {market.market_name}.")
 
 
-class MarketFollowersListView(APIView):
-    """
-    GET /stores/markets/<pk>/followers/
-    Lists all followers of a market (owner / staff only).
-    """
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, pk: int):
-        market = get_object_or_404(Market, pk=pk)
-        if market.seller_id != request.user.pk and not request.user.is_staff:
-            return forbidden("Only the market owner can view followers.")
-        serializer = MarketFollowersListSerializer(market)
-        return ok("Followers retrieved.", data=serializer.data)
 
 
-class FollowedMarketsView(APIView):
-    """
-    GET /stores/markets/following/
-    Markets the authenticated user is following.
-    """
-    permission_classes = [IsAuthenticated]
 
-    def get(self, request):
-        # Replace with real queryset once MarketFollower model is added:
-        # markets = Market.objects.filter(followers__user=request.user, is_active=True)
-        markets    = Market.objects.none()
-        serializer = FollowedMarketsSerializer(markets, many=True)
-        return ok("Followed markets retrieved.", data={
-            "count":   0,
-            "markets": serializer.data,
-        })
+
+
+
+
+
+
+# # ═════════════════════════════════════════════════════════════════════════════
+# # MARKET FOLLOWERS
+# # Note: placeholder views — swap body for real logic once MarketFollower
+# # model is added.
+# # ═════════════════════════════════════════════════════════════════════════════
+
+# class MarketFollowView(APIView):
+#     """
+#     POST   /stores/markets/<pk>/follow/     → follow
+#     DELETE /stores/markets/<pk>/follow/     → unfollow
+#     """
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request, pk: int):
+#         market = _get_active_market(pk)
+#         if not market:
+#             return not_found("Market not found.")
+
+#         serializer = FollowMarketSerializer(
+#             data={},
+#             context={"request": request, "market": market},
+#         )
+#         serializer.is_valid(raise_exception=True)
+#         serializer.save()
+#         return ok(f"You are now following {market.market_name}.")
+
+#     def delete(self, request, pk: int):
+#         market = _get_active_market(pk)
+#         if not market:
+#             return not_found("Market not found.")
+
+#         serializer = UnfollowMarketSerializer(
+#             data={},
+#             context={"request": request, "market": market},
+#         )
+#         serializer.is_valid(raise_exception=True)
+#         serializer.save()
+#         return ok(f"You have unfollowed {market.market_name}.")
+
+
+# class MarketFollowersListView(APIView):
+#     """
+#     GET /stores/markets/<pk>/followers/
+#     Lists all followers of a market (owner / staff only).
+#     """
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request, pk: int):
+#         market = get_object_or_404(Market, pk=pk)
+#         if market.seller_id != request.user.pk and not request.user.is_staff:
+#             return forbidden("Only the market owner can view followers.")
+#         serializer = MarketFollowersListSerializer(market)
+#         return ok("Followers retrieved.", data=serializer.data)
+
+
+# class FollowedMarketsView(APIView):
+#     """
+#     GET /stores/markets/following/
+#     Markets the authenticated user is following.
+#     """
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request):
+#         # Replace with real queryset once MarketFollower model is added:
+#         # markets = Market.objects.filter(followers__user=request.user, is_active=True)
+#         markets    = Market.objects.none()
+#         serializer = FollowedMarketsSerializer(markets, many=True)
+#         return ok("Followed markets retrieved.", data={
+#             "count":   0,
+#             "markets": serializer.data,
+#         })
