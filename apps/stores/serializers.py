@@ -517,11 +517,49 @@ class TrendingMarketsSerializer(serializers.ModelSerializer):
         return obj.reviews.filter(is_approved=True, created_at__gte=since).count()
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+# MARKET REVIEWS
+# ═════════════════════════════════════════════════════════════════════════════
+class MarketReviewSerializer(serializers.ModelSerializer):
+    """
+    Full review details - used as a base / nested serializer
+    """
     
+    reviewer_name = serializer.SerializerMethodField()
+    reviewer_avatar = serializer.SerializerMethodField()
+
+    class Meta:
+        model = MarketReview
+        fields = [
+            'id', 'reviewer_name', 'reviewer_avatar', 
+            'rating', 'comment', 'is_approved', 'created_at',
+            'updated_at',            
+        ]
+        read_only_fields = fields
+
+    def get_reviewer_name(self, obj):
+        return obj.user.get_full_name() or obj.user.username
+
+    def get_reviewer_avatar(self, obj):
+        return obj.user.get_avatar_url()
+
+
+class MarketReviewCreateSerializer(serializers.ModelSerializer):
+    """
+    Creates a new market review
+    POST /stores/markets/<id>/reviews/
+    One review per order enforced at model level
+    """
+
+    class Meta:
+        model = MarketReview
+        fields = ['order', 'rating', 'comment']
+        extra_kwargs = {
+            'order': {'required': True},
+            'comment': {'required': False},
+        }
     
-
-
-
+    def validate()
 
 
 
@@ -544,27 +582,6 @@ class TrendingMarketsSerializer(serializers.ModelSerializer):
 # ═════════════════════════════════════════════════════════════════════════════
 # MARKET REVIEWS
 # ═════════════════════════════════════════════════════════════════════════════
-
-class MarketReviewSerializer(serializers.ModelSerializer):
-    """Full review details — used as a base / nested serializer."""
-    reviewer_name = serializers.SerializerMethodField()
-    reviewer_avatar = serializers.SerializerMethodField()
-
-    class Meta:
-        model  = MarketReview
-        fields = [
-            'id', 'reviewer_name', 'reviewer_avatar',
-            'rating', 'comment', 'is_approved',
-            'created_at', 'updated_at',
-        ]
-        read_only_fields = fields
-
-    def get_reviewer_name(self, obj):
-        return obj.user.get_full_name() or obj.user.username
-
-    def get_reviewer_avatar(self, obj):
-        return obj.user.get_avatar_url()
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 
