@@ -1,124 +1,26 @@
 """
 products/views.py
-==================
+=================
 Permissions:
-  AllowAny       – public product/category browsing
-  IsAuthenticated– reviews, wishlists
-  IsSellerOnly   – create/update/delete own products
-  IsAdminUser    – category/attribute management
+    AllowAny            - public product/category browsing
+    IsAuthenticated     - reviews, wishlists
+    IsSellerOnly        - create/update/delete own products
+    IsAdminUser         - category/attribute management
 """
 
 from django.db.models import Q, Count, Avg
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
-from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import (
-    Category, Product, ProductAttribute, ProductAttributeValue,
-    ProductImage, ProductReview, ProductVariant, Wishlist, WishlistItem,
-)
-from .serializers import (
-    # Categories
-    CategoryBreadcrumbSerializer, CategoryBrowseSerializer,
-    CategoryCreateSerializer, CategoryDeleteSerializer,
-    CategoryDetailSerializer, CategoryListSerializer,
-    CategoryProductCountSerializer, CategoryProductListSerializer,
-    CategorySerializer, CategoryTreeSerializer, CategoryUpdateSerializer,
-    CategoryWithTopProductsSerializer, PopularCategoriesSerializer,
-    SubcategoryListSerializer,
-    # Products
-    BestSellersSerializer, FeaturedProductsSerializer,
-    NewArrivalsSerializer, ProductBestSellerSerializer,
-    ProductCardSerializer, ProductCompareAddSerializer,
-    ProductCompareListSerializer, ProductCompareSerializer,
-    ProductCreateSerializer, ProductDeleteSerializer,
-    ProductDetailSerializer, ProductFeaturedSerializer,
-    ProductFilterSerializer, ProductListSerializer,
-    ProductNewArrivalSerializer, ProductPublicSerializer,
-    ProductQuickViewSerializer, ProductRelatedSerializer,
-    ProductSearchSerializer, ProductSellerSerializer,
-    ProductSerializer, ProductStatsSerializer,
-    ProductTopRatedSerializer, ProductTrendingSerializer,
-    ProductUpdateSerializer, RecommendedProductsSerializer,
-    SimilarProductsSerializer, TrendingProductsSerializer,
-    YouMayAlsoLikeSerializer,
-    # Stock
-    ProductLowStockSerializer, ProductStockSerializer,
-    ProductStockUpdateSerializer,
-    # Images
-    ProductImageBulkUploadSerializer, ProductImageCreateSerializer,
-    ProductImageDeleteSerializer, ProductImageListSerializer,
-    ProductImageSerializer, ProductImageUpdateSerializer,
-    SetPrimaryImageSerializer,
-    # Variants
-    ProductVariantCreateSerializer, ProductVariantDeleteSerializer,
-    ProductVariantListSerializer, ProductVariantSerializer,
-    ProductVariantStockSerializer, ProductVariantUpdateSerializer,
-    # Attributes
-    ProductAttributeCreateSerializer, ProductAttributeDeleteSerializer,
-    ProductAttributeListSerializer, ProductAttributeSerializer,
-    ProductAttributeUpdateSerializer, ProductAttributeValueCreateSerializer,
-    ProductAttributeValueListSerializer, ProductAttributeValueSerializer,
-    # Reviews
-    ProductReviewCreateSerializer, ProductReviewDeleteSerializer,
-    ProductReviewHelpfulSerializer, ProductReviewListSerializer,
-    ProductReviewSerializer, ProductReviewStatsSerializer,
-    ProductReviewUpdateSerializer, ProductReviewVerifiedSerializer,
-    ProductReviewWithImagesSerializer,
-    # Wishlists
-    WishlistCreateSerializer, WishlistDeleteSerializer,
-    WishlistDetailSerializer, WishlistItemBulkDeleteSerializer,
-    WishlistItemCountSerializer, WishlistItemCreateSerializer,
-    WishlistItemDeleteSerializer, WishlistItemDetailSerializer,
-    WishlistItemListSerializer, WishlistItemSerializer,
-    WishlistListSerializer, WishlistSerializer, WishlistUpdateSerializer,
-    # Discovery
-    FrequentlyBoughtTogetherSerializer,
-    # Browsing
-    AvailableFiltersSerializer, ProductGridSerializer,
-    ProductListPageSerializer, SortOptionsSerializer,
-    # Personalisation
-    BasedOnYourInterestsSerializer, BecauseYouViewedSerializer,
-    ForYouSerializer, PersonalizedFeedSerializer,
-    RecentlyViewedSerializer, ViewHistorySerializer,
-)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Response helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
-def ok(message, data=None, http_status=status.HTTP_200_OK):
-    body = {"status": "success", "message": message}
-    if data is not None:
-        body["data"] = data
-    return Response(body, status=http_status)
-
-
-def created(message, data=None):
-    return ok(message, data, http_status=status.HTTP_201_CREATED)
-
-
-def not_found(message="Not found."):
-    return Response({"status": "error", "message": message}, status=status.HTTP_404_NOT_FOUND)
-
-
-def forbidden(message="Permission denied."):
-    return Response({"status": "error", "message": message}, status=status.HTTP_403_FORBIDDEN)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Custom permissions
-# ─────────────────────────────────────────────────────────────────────────────
-
-class IsSellerOnly(IsAuthenticated):
-    def has_permission(self, request, view):
-        return super().has_permission(request, view) and request.user.is_seller
+from .models import *
+from .serializers import *
+from apps.utils.response_helpers import *
+from apps.utils.permissions import *
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -127,6 +29,7 @@ class IsSellerOnly(IsAuthenticated):
 
 def _apply_filters(qs, params):
     """Apply ProductFilterSerializer validated params to a queryset."""
+
     if params.get('q'):
         qs = qs.filter(
             Q(name__icontains=params['q']) |
@@ -137,8 +40,10 @@ def _apply_filters(qs, params):
         qs = qs.filter(category_id=params['category'])
     if params.get('min_price') is not None:
         qs = qs.filter(price__gte=params['min_price'])
+    
     if params.get('max_price') is not None:
         qs = qs.filter(price__lte=params['max_price'])
+
     if params.get('min_rating') is not None:
         qs = qs.filter(rating_average__gte=params['min_rating'])
     if params.get('in_stock') is True:
@@ -147,18 +52,35 @@ def _apply_filters(qs, params):
         qs = qs.filter(is_featured=params['is_featured'])
     if params.get('market'):
         qs = qs.filter(market_id=params['market'])
-
+    
     sort_map = {
-        'price_asc':  'price',
-        'price_desc': '-price',
-        'rating':     '-rating_average',
-        'newest':     '-created_at',
-        'popular':    '-view_count',
-        'sales':      '-sold_count',
+        'price_asc':    'price',
+        'price_desc':   '-price',
+        'rating':       '-rating_average',
+        'newest':       '-created_at',
+        'popular':      '-view_count',
+        'sales':        '-sold_count',
     }
     sort = params.get('sort', 'newest')
     qs = qs.order_by(sort_map.get(sort, '-created_at'))
     return qs
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ═════════════════════════════════════════════════════════════════════════════

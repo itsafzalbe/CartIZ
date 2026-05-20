@@ -24,48 +24,9 @@ from rest_framework.views import APIView
 
 from .models import *
 from .serializers import *
+from apps.utils.response_helpers import *
+from apps.utils.permissions import *
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Response helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
-def ok(message: str, data=None, http_status=status.HTTP_200_OK) -> Response:
-    body = {"status": "success", "message": message}
-    if data is not None:
-        body["data"] = data
-    return Response(body, status=http_status)
-
-
-def created(message: str, data=None) -> Response:
-    return ok(message, data, http_status=status.HTTP_201_CREATED)
-
-
-def not_found(message: str = "Not found.") -> Response:
-    return Response(
-        {"status": "error", "message": message},
-        status=status.HTTP_404_NOT_FOUND
-    )
-
-def forbidden(message: str= "Permission denied.") -> Response:
-    return Response(
-        {"status": "error", "message": message},
-        status=status.HTTP_403_FORBIDDEN
-    )
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Custom permissions
-# ─────────────────────────────────────────────────────────────────────────────
-
-class IsSellerOnly(IsAuthenticated):
-    """works if is_seller is True"""
-    def has_permission(self, request, view):
-        return super().has_permission(request, view) and request.user.is_seller
-
-class IsMarketOwner(IsAuthenticated):
-    """ User must own the market resolved from the URL"""
-    def has_permission(self, request, view):
-        return super().has_permission(request, view) and request.user.is_seller
-    
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared market lookup
@@ -480,7 +441,7 @@ class MarketReviewListCreateView(APIView):
             data = MarketReviewSerializer(review).data,
         )
     
-class MarketReviewDetailSerializer(APIView):
+class MarketReviewDetailView(APIView):
     """
     GET     /stores/markets/reviews/<pk>/   -> fill review detail
     PATCH   /stores/markets/reviews/<pk>/   -> edit own review
@@ -492,11 +453,11 @@ class MarketReviewDetailSerializer(APIView):
             return [AllowAny()]
         return [IsAuthenticated()]
 
-        def _get_review(self, pk):
-            try:
-                return MarketReview.objects.select_related('user', 'market', 'order').get(pk=pk)\
-            except MarketReview.DoesNotExist:
-                return None
+    def _get_review(self, pk):
+        try:
+            return MarketReview.objects.select_related('user', 'market', 'order').get(pk=pk)
+        except MarketReview.DoesNotExist:
+            return None
 
     def get(self, request, pk: int):
         review = self._get_review(pk)
@@ -520,7 +481,7 @@ class MarketReviewDetailSerializer(APIView):
 
     def delete(self, request, pk: int):
         review = self._get_review(pk)
-        if not reveiw:
+        if not review:
             return not_found("Review not found.")
         serializer = MarketReviewDeleteSerializer(
             data={},

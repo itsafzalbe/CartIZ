@@ -33,20 +33,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 
 from .models import *
 from .serializers import *
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Response helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
-def success(message: str, data: dict = None, http_status = status.HTTP_200_OK) -> Response:
-    body = {"status": "success", "message": message}
-    if data is not None:
-        body["data"] = data
-    return Response(body, status=http_status)
-
-def created(message: str, data: dict=None) -> Response:
-    return success(message, data, http_status=status.HTTP_201_CREATED)
+from apps.utils.response_helpers import *
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -83,7 +70,7 @@ class RegisterEmailView(APIView):
         serializer = UserRegistrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        return success(
+        return ok(
             "A verification code has been sent to your email address",
             data={"email": user.email},
         )
@@ -108,7 +95,7 @@ class VerifyEmailView(APIView):
         serializer = EmailVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        return success(
+        return ok(
             "Email verified. Please complete your profile.",
             data = {
                 "user_id":     str(user.pk),
@@ -136,7 +123,7 @@ class ResendOTPView(APIView):
         serializer = ResendVerificationEmailSerializer(data = request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return success(
+        return ok(
             "A new verification code has been sent to your email address.",
             data = {"resend_after_seconds": serializer.seconds_until_next},
         )
@@ -175,7 +162,7 @@ class CompleteProfileView(APIView):
         from rest_framework_simplejwt.tokens import RefreshToken
         refresh = RefreshToken.for_user(user)
 
-        return success(
+        return ok(
             "Account created successfully. Welcome!",
             data = {
                 "auth_status": user.auth_status,
@@ -210,7 +197,7 @@ class LoginView(APIView):
         user.last_login_ip = ip
         user.save(update_fields=["last_login_ip"])
 
-        return success(
+        return ok(
             "Logged in successfully.",
             data={
                 **tokens,
@@ -247,7 +234,7 @@ class LogoutView(APIView):
         serializer = UserLogoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return success("Logged out successfully.")
+        return ok("Logged out successfully.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -267,7 +254,7 @@ class TokenRefreshView(APIView):
     def post(self, request):
         serializer = RefreshTokenSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        return success("Token refreshed.", data=serializer.get_tokens())
+        return ok("Token refreshed.", data=serializer.get_tokens())
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -285,7 +272,7 @@ class PasswordChangeView(APIView):
         serializer = PasswordChangeSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return success("Password changed successfully.")
+        return ok("Password changed successfully.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -306,7 +293,7 @@ class PasswordResetRequestView(APIView):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return success(
+        return ok(
             "If that email address is registered you will receive a reset link shortly."
         )
 
@@ -327,8 +314,7 @@ class PasswordResetConfirmView(APIView):
         serializer = PasswordResetConfirmSerializer(data = request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return success("Password reset successfully. You can now log in.")
-    
+        return ok("Password reset successfully. You can now log in.")
 
 
 
@@ -462,7 +448,7 @@ class UserProfileView(APIView):
 
     def get(self, request):
         serializer = UserProfileSerializer(request.user)
-        return success("Profile retrieved", data=serializer.data)
+        return ok("Profile retrieved", data=serializer.data)
 
 
 
@@ -477,7 +463,7 @@ class UserDetailView(APIView):
     
     def get(self, request):
         serializer = UserDetailSerializer(request.user)
-        return success("Full profile retrieved.", data=serializer.data)
+        return ok("Full profile retrieved.", data=serializer.data)
     
 
 
@@ -492,7 +478,7 @@ class UserPublicView(APIView):
         from django.shortcuts import get_object_or_404
         user = get_object_or_404(User, username=username, is_active=True)
         serializer = UserPublicSerializer(user)
-        return success("Public profile retrieved.", data=serializer.data)
+        return ok("Public profile retrieved.", data=serializer.data)
     
 
 class UserUpdateView(APIView):
@@ -507,7 +493,7 @@ class UserUpdateView(APIView):
         serializer = UserUpdateSerializer(request.user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return success("Profile updated.", data=serializer.data)
+        return ok("Profile updated.", data=serializer.data)
 
 
 class UserAvatarUpdateView(APIView):
@@ -523,7 +509,7 @@ class UserAvatarUpdateView(APIView):
         serializer = UserAvatarUpdateSerializer(request.user, data=request.data or request.FILES, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        return success(
+        return ok(
             "Profile picture updated.",
             data={"avatar_url": user.get_avatar_url()},
         )
@@ -540,7 +526,7 @@ class UserDeleteView(APIView):
         serializer = UserDeleteSerializer(data=request.data, context={"request": request},)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return success("Account deleted successfully.")
+        return ok("Account deleted successfully.")
 
 
 
@@ -553,7 +539,7 @@ class UserStatsView(APIView):
 
     def get(self, request):
         serializer = UserStatsSerializer(request.user)
-        return success("Activity retrieved.", data=serializer.data)
+        return ok("Activity retrieved.", data=serializer.data)
 
 
 
@@ -567,7 +553,7 @@ class UserActivityView(APIView):
 
     def get(self, request):
         serializer = UserActivitySerializer(request.user)
-        return success("Acitivity retrieved", data=serializer.data)
+        return ok("Acitivity retrieved", data=serializer.data)
 
 # # ═════════════════════════════════════════════════════════════════════════════
 # # ADDRESS VIEWS
@@ -584,7 +570,7 @@ class UserAddressListCreateView(APIView):
     def get(self, request):
         addresses = request.user.user_address.all()
         serializer = UserAddressListSerializer(addresses, many=True)
-        return success("Addresses retrieved.", data={"addresses": serializer.data})
+        return ok("Addresses retrieved.", data={"addresses": serializer.data})
     
     def post(self, request):
         serializer = UserAddressCreateSerializer(data=request.data, context={"request": request}, )
@@ -618,7 +604,7 @@ class UserAddressDetailView(APIView):
                 {"status": "error", "message": "Address not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        return success("Address retrieved.", data=UserAddressSerializer(address).data)
+        return ok("Address retrieved.", data=UserAddressSerializer(address).data)
     
     def patch(self, request, pk: int):
         address = self._get_address(request, pk)
@@ -630,7 +616,7 @@ class UserAddressDetailView(APIView):
         serializer = UserAddressUpdateSerializer(address, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return success("Address updated.", data=UserAddressSerializer(address).data)
+        return ok("Address updated.", data=UserAddressSerializer(address).data)
     
     def delete(self, request, pk: int):
         serializer = UserAddressDeleteSerializer(
@@ -639,7 +625,7 @@ class UserAddressDetailView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return success("Address deleted.")
+        return ok("Address deleted.")
  
 
 
@@ -654,4 +640,4 @@ class SetDefaultAddressView(APIView):
         serializer = SetDefaultAddressSerializer(data={"address_id": pk}, context={"request": request})
         serializer.is_valid(raise_exception=True)
         address = serializer.save()
-        return success("Default address updated.", data=UserAddressSerializer(address).data)
+        return ok("Default address updated.", data=UserAddressSerializer(address).data)

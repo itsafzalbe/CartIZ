@@ -525,8 +525,8 @@ class MarketReviewSerializer(serializers.ModelSerializer):
     Full review details - used as a base / nested serializer
     """
     
-    reviewer_name = serializer.SerializerMethodField()
-    reviewer_avatar = serializer.SerializerMethodField()
+    reviewer_name = serializers.SerializerMethodField()
+    reviewer_avatar = serializers.SerializerMethodField()
 
     class Meta:
         model = MarketReview
@@ -613,7 +613,7 @@ class MarketReviewDeleteSerializer(serializers.Serializer):
         review = self.context["review"]
         user  = self.context['request'].user
         if review.user_id != user.pk and not user.is_staff:
-            raise serializer.ValidationError(
+            raise serializers.ValidationError(
                 "You can only delete your own reviews."
             )
         return attrs
@@ -627,7 +627,7 @@ class MarketReviewListSerializer(serializers.ModelSerializer):
     Lightweight review list item
     GET /stores/markets/<id>/reviews/
     """ 
-    reviewer_name = serializer.SerializerMethodField()
+    reviewer_name = serializers.SerializerMethodField()
 
     class Meta:
         model = MarketReview

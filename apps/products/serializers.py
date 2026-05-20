@@ -23,22 +23,16 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.accounts.models import User
-from .models import (
-    Category, Product, ProductImage, ProductVariant,
-    ProductAttribute, ProductAttributeValue,
-    ProductReview, Wishlist, WishlistItem,
-)
-
+from .models import *
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared helpers
 # ─────────────────────────────────────────────────────────────────────────────
-
 def _primary_image(product: Product) -> str | None:
     img = product.product_images.filter(is_primary=True).first()
     if not img:
         img = product.product_images.first()
-    return img.image.url if img else None
+    return img.image_url if img else None
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -46,30 +40,43 @@ def _primary_image(product: Product) -> str | None:
 # ═════════════════════════════════════════════════════════════════════════════
 
 class CategorySerializer(serializers.ModelSerializer):
-    """Basic category info — used as nested reference."""
-
+    """Basic category info - used as nested referenece """
+    
     class Meta:
-        model  = Category
+        model = Category
         fields = ['id', 'name', 'slug', 'description', 'icon', 'is_active', 'order_position']
         read_only_fields = fields
 
 
 class CategoryCreateSerializer(serializers.ModelSerializer):
     """
-    Creates a new category. Admin only.
+    Creates a new category. Admin only
     POST /products/categories/
     """
-
     class Meta:
-        model  = Category
+        model = Category
         fields = ['parent_id', 'name', 'description', 'image', 'icon', 'order_position', 'is_active']
-        extra_kwargs = {'name': {'required': True}}
-
+        extra_kwargs = {"name": {"required": True}}
+    
     def validate_name(self, value):
         if Category.objects.filter(name__iexact=value).exists():
-            raise serializers.ValidationError("A category with this name already exists.")
+            raise serializers.ValidationError("A cateogry with this name already exists.")
         return value
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 class CategoryUpdateSerializer(serializers.ModelSerializer):
     """
