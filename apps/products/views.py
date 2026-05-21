@@ -66,35 +66,17 @@ def _apply_filters(qs, params):
     return qs
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ═════════════════════════════════════════════════════════════════════════════
 # CATEGORIES
 # ═════════════════════════════════════════════════════════════════════════════
-
 class CategoryListCreateView(APIView):
     """
-    GET  /products/categories/    → list active categories
-    POST /products/categories/    → create category (admin)
+    GET /products/categories/   -> list active categories
+    POST /products/categories/  -> create category (admin)
     """
 
     def get_permissions(self):
-        return [IsAdminUser()] if self.request.method == 'POST' else [AllowAny()]
+        return [IsAdminUser()] if self.request.method == "POST" else [AllowAny()]
 
     def get(self, request):
         categories = Category.objects.filter(is_active=True, parent_id__isnull=True).order_by('order_position')
@@ -106,46 +88,43 @@ class CategoryListCreateView(APIView):
         cat = s.save()
         return created("Category created.", data=CategorySerializer(cat).data)
 
-
 class CategoryDetailView(APIView):
     """
-    GET    /products/categories/<id>/   → detail with subcategories
-    PATCH  /products/categories/<id>/   → update (admin)
-    DELETE /products/categories/<id>/   → soft-delete (admin)
+    GET     /products/categories/<id>/      -> detail with subcategories
+    PATCH   /products/categories/<id>/      -> update (admin)
+    DELETE  /products/categories/<id>/      -> soft-delete (admin)
     """
 
     def get_permissions(self):
-        return [AllowAny()] if self.request.method == 'GET' else [IsAdminUser()]
-
+        return [AllowAny()] if self.request.method == "GET" else [IsAdminUser()]
+    
     def _get(self, pk):
         return get_object_or_404(Category, pk=pk, is_active=True)
 
-    def get(self, request, pk):
+    def get(self, pk):
         return ok("Category retrieved.", data=CategoryDetailSerializer(self._get(pk)).data)
-
+    
     def patch(self, request, pk):
         cat = self._get(pk)
-        s   = CategoryUpdateSerializer(cat, data=request.data, partial=True)
+        s = CategoryUpdateSerializer(cat, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
         return ok("Category updated.", data=CategorySerializer(s.save()).data)
-
+    
     def delete(self, request, pk):
         cat = self._get(pk)
         CategoryDeleteSerializer(data={}, context={'category': cat}).save()
         return ok("Category deactivated.")
 
-
 class CategoryTreeView(APIView):
-    """GET /products/categories/tree/  — full nested tree."""
+    """GET /products/categories/tree/   -full nested tree"""
     permission_classes = [AllowAny]
 
     def get(self, request):
         roots = Category.objects.filter(is_active=True, parent_id__isnull=True).order_by('order_position')
         return ok("Category tree retrieved.", data={"tree": CategoryTreeSerializer(roots, many=True).data})
 
-
 class CategoryBrowseView(APIView):
-    """GET /products/categories/<id>/browse/ — category page with subcategories."""
+    """GET /products/categories/<id>/browse/ - category page with subcategories."""
     permission_classes = [AllowAny]
 
     def get(self, request, pk):
@@ -153,8 +132,10 @@ class CategoryBrowseView(APIView):
         return ok("Category browse data retrieved.", data=CategoryBrowseSerializer(cat).data)
 
 
+
 class PopularCategoriesView(APIView):
     """GET /products/categories/popular/"""
+
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -165,7 +146,7 @@ class PopularCategoriesView(APIView):
 
 
 class CategoryWithTopProductsView(APIView):
-    """GET /products/categories/with-products/ — each category + top 4 products."""
+    """GET /products/categories/with-products/ - each category + top 4 products."""
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -187,55 +168,74 @@ class SubcategoryListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, pk):
-        cat  = get_object_or_404(Category, pk=pk, is_active=True)
+        cat = get_object_or_404(Category, pk=pk, is_active=True)
         subs = cat.Children.filter(is_active=True).order_by('order_position')
         return ok("Subcategories retrieved.", data={"subcategories": SubcategoryListSerializer(subs, many=True).data})
 
 
-class CategoryProductListView(APIView):
-    """GET /products/categories/<id>/products/ — products in a category with filters."""
+class CategoryProductListSerializer(APIView):
+    """GET /products/categories/<id>/products/ - products in a category with filters"""
+
     permission_classes = [AllowAny]
 
     def get(self, request, pk):
         cat = get_object_or_404(Category, pk=pk, is_active=True)
-        qs  = Product.objects.filter(category=cat, is_active=True)
+        qs = Product.objects.filter(category=cat, is_active=True)
 
         filter_s = ProductFilterSerializer(data=request.query_params)
         if filter_s.is_valid():
             qs = _apply_filters(qs, filter_s.validated_data)
 
-        return ok("Products retrieved.", data={
-            "category": CategorySerializer(cat).data,
-            "count":    qs.count(),
-            "products": CategoryProductListSerializer(qs, many=True).data,
+        return ok("Product retrieved.", data={
+            "category":     CategorySerializer(cat).data,
+            "count":        qs.count(),
+            "products":     CategoryProductListSerializer(qs, many=True).data,
         })
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# PRODUCTS — CRUD
-# ═════════════════════════════════════════════════════════════════════════════
 
 class ProductListCreateView(APIView):
     """
-    GET  /products/            → list all active products (with filters)
-    POST /products/            → create product (seller)
+    GET /products/          ->lists all active products (with filters)
+    POST /products/         ->create products (seller)
     """
 
     def get_permissions(self):
         return [IsSellerOnly()] if self.request.method == 'POST' else [AllowAny()]
 
+    
     def get(self, request):
         qs = Product.objects.filter(is_active=True).select_related('market', 'category')
         filter_s = ProductFilterSerializer(data=request.query_params)
         if filter_s.is_valid():
             qs = _apply_filters(qs, filter_s.validated_data)
         return ok("Products retrieved.", data={"count": qs.count(), "products": ProductListSerializer(qs, many=True).data})
-
+    
     def post(self, request):
         s = ProductCreateSerializer(data=request.data, context={"request": request})
         s.is_valid(raise_exception=True)
         product = s.save()
         return created("Product created.", data=ProductDetailSerializer(product).data)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PRODUCTS — CRUD
+# ═════════════════════════════════════════════════════════════════════════════
+
 
 
 class ProductDetailView(APIView):
@@ -440,7 +440,27 @@ class ProductImageBulkUploadView(APIView):
         product = get_object_or_404(Product, slug=slug, is_active=True)
         if product.market.seller_id != request.user.pk:
             return forbidden()
-        s = ProductImageBulkUploadSerializer(data=request.data, context={"product": product})
+        s = ProductImageBulkUploclass ProductListCreateView(APIView):
+    """
+    GET  /products/            → list all active products (with filters)
+    POST /products/            → create product (seller)
+    """
+
+    def get_permissions(self):
+        return [IsSellerOnly()] if self.request.method == 'POST' else [AllowAny()]
+
+    def get(self, request):
+        qs = Product.objects.filter(is_active=True).select_related('market', 'category')
+        filter_s = ProductFilterSerializer(data=request.query_params)
+        if filter_s.is_valid():
+            qs = _apply_filters(qs, filter_s.validated_data)
+        return ok("Products retrieved.", data={"count": qs.count(), "products": ProductListSerializer(qs, many=True).data})
+
+    def post(self, request):
+        s = ProductCreateSerializer(data=request.data, context={"request": request})
+        s.is_valid(raise_exception=True)
+        product = s.save()
+        return created("Product created.", data=ProductDetailSerializer(product).data)adSerializer(data=request.data, context={"product": product})
         s.is_valid(raise_exception=True)
         images = s.save()
         return created(f"{len(images)} image(s) uploaded.", data=ProductImageListSerializer(images, many=True).data)

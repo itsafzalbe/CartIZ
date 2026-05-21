@@ -63,118 +63,104 @@ class CategoryCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("A cateogry with this name already exists.")
         return value
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-
 class CategoryUpdateSerializer(serializers.ModelSerializer):
     """
-    Updates category details. Admin only.
+    Updates category details. Admin only
     PATCH /products/categories/<id>/
     """
 
     class Meta:
-        model  = Category
+        model = Category
         fields = ['parent_id', 'name', 'description', 'image', 'icon', 'order_position', 'is_active']
-        extra_kwargs = {f: {'required': False} for f in fields}
+        extra_kwargs = {f: {"required": False} for f in fields}
 
     def validate_name(self, value):
         qs = Category.objects.filter(name__iexact=value).exclude(pk=self.instance.pk)
         if qs.exists():
             raise serializers.ValidationError("A category with this name already exists.")
         return value
-
+    
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         return instance
 
-
 class CategoryDeleteSerializer(serializers.Serializer):
     """
-    Soft-deletes a category by deactivating it.
+    Soft deletes a category by deactivating it.
     DELETE /products/categories/<id>/
     """
 
     def save(self):
-        category           = self.context['category']
+        category        = self.context['category']
         category.is_active = False
         category.save(update_fields=['is_active'])
 
 
 class CategoryListSerializer(serializers.ModelSerializer):
-    """Minimal category data for list views and dropdowns."""
+    """Minimal category data for list views and dropdowns"""
+
     product_count = serializers.SerializerMethodField()
 
     class Meta:
-        model  = Category
+        model = Category
         fields = ['id', 'name', 'slug', 'icon', 'is_active', 'product_count']
         read_only_fields = fields
 
     def get_product_count(self, obj):
         return obj.products.filter(is_active=True).count()
 
-
 class CategoryTreeSerializer(serializers.ModelSerializer):
     """
-    Recursive category tree — used for mega-menu and navigation.
+    Recursive category tree - used for mega menu and navigation
     GET /products/categories/tree/
     """
+
     children = serializers.SerializerMethodField()
 
     class Meta:
-        model  = Category
+        model = Category
         fields = ['id', 'name', 'slug', 'icon', 'order_position', 'children']
         read_only_fields = fields
-
+    
     def get_children(self, obj):
         qs = obj.Children.filter(is_active=True).order_by('order_position')
         return CategoryTreeSerializer(qs, many=True).data
 
-
 class CategoryDetailSerializer(serializers.ModelSerializer):
     """
-    Category with subcategories and top products.
+    Category with subcategories and top products
     GET /products/categories/<id>/
     """
-    children      = serializers.SerializerMethodField()
+
+    children = serializers.SerializerMethodField()
     product_count = serializers.SerializerMethodField()
 
     class Meta:
-        model  = Category
+        model = Category
         fields = [
-            'id', 'name', 'slug', 'description', 'icon',
-            'is_active', 'order_position',
-            'product_count', 'children',
+            'id', 'name', 'slug', 'description', 'icon', 
+            'is_active', 'order_position', 'product_count', 
+            'children',
         ]
         read_only_fields = fields
-
+    
     def get_children(self, obj):
         qs = obj.Children.filter(is_active=True).order_by('order_position')
         return CategoryListSerializer(qs, many=True).data
-
+    
     def get_product_count(self, obj):
         return obj.products.filter(is_active=True).count()
 
 
+
 class CategoryProductCountSerializer(serializers.ModelSerializer):
-    """Category with product count — used in filter sidebars."""
+    """Category with product count - used in the filter sidebars"""
     product_count = serializers.SerializerMethodField()
 
     class Meta:
-        model  = Category
+        model = Category
         fields = ['id', 'name', 'slug', 'product_count']
         read_only_fields = fields
 
@@ -182,60 +168,57 @@ class CategoryProductCountSerializer(serializers.ModelSerializer):
         return obj.products.filter(is_active=True).count()
 
 
+
 # ═════════════════════════════════════════════════════════════════════════════
 # PRODUCTS
 # ═════════════════════════════════════════════════════════════════════════════
 
 class ProductSerializer(serializers.ModelSerializer):
-    """Basic product info — base / nested reference serializer."""
-    primary_image      = serializers.SerializerMethodField()
+    """Basic product info - base / nested reference serializer"""
+    primary_image = serializers.SerializerMethodField()
     discount_percentage = serializers.ReadOnlyField()
-    in_stock           = serializers.ReadOnlyField()
+    in_stock = serializers.ReadOnlyField()
 
     class Meta:
-        model  = Product
+        model = Product
         fields = [
-            'id', 'name', 'slug', 'sku',
-            'price', 'compare_at_price', 'discount_percentage',
-            'stock_quantity', 'in_stock',
-            'rating_average', 'review_count',
-            'is_active', 'is_featured', 'primary_image',
-            'created_at',
+        'id', 'name', 'slug', 'sku', 
+        'price', 'compare_at_price', 'discount_percentage', 
+        'stock_quantity', 'in_stock', 'rating_average', 
+        'review_count', 'is_active', 'is_featured', 'primary_image',
+        'created_at',
         ]
         read_only_fields = fields
-
+    
     def get_primary_image(self, obj):
         return _primary_image(obj)
 
-
 class ProductCreateSerializer(serializers.ModelSerializer):
     """
-    Creates a new product for the authenticated seller's market.
+    Creates a new product for the authenticated seller's market
     POST /products/
     """
 
     class Meta:
-        model  = Product
+        model = Product
         fields = [
-            'category', 'name', 'description', 'short_description',
-            'sku', 'barcode',
-            'price', 'compare_at_price', 'cost_price',
-            'stock_quantity', 'low_stock_threshold',
-            'weight', 'dimensions',
+            'category', 'name', 'description', 'short_description', 
+            'sku', 'barcode', 'price', 'compare_at_price', 'cost_price',
+            'stock_quantity', 'low_stock_threshold', 'weight', 'dimensions',
             'is_featured', 'is_active', 'is_digital',
         ]
         extra_kwargs = {
-            'name':       {'required': True},
-            'sku':        {'required': True},
-            'barcode':    {'required': True},
-            'price':      {'required': True},
-            'cost_price': {'required': True},
-            'category':   {'required': True},
+            'name':         {'required': True},
+            'sku':          {'required': True},
+            'barcode':      {'required': True},
+            'price':        {'required': True},
+            'cost_price':   {'required': True},
+            'category':     {'required': True},
         }
-
+    
     def validate(self, attrs):
         request = self.context['request']
-        market  = request.user.markets.filter(is_active=True).first()
+        market = request.user.markets.filter(is_active=True).first()
         if not market:
             raise serializers.ValidationError("You must have an active market to create products.")
         self._market = market
@@ -244,54 +227,52 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         if Product.objects.filter(market=market, sku=sku).exists():
             raise serializers.ValidationError({"sku": "A product with this SKU already exists in your market."})
 
-        barcode = attrs.get('barcode', '')
+        barcode = attrs.get('barcode'. '')
         if Product.objects.filter(market=market, barcode=barcode).exists():
             raise serializers.ValidationError({"barcode": "A product with this barcode already exists in your market."})
-
+            
         return attrs
-
+    
     def create(self, validated_data):
         return Product.objects.create(market=self._market, **validated_data)
 
 
 class ProductUpdateSerializer(serializers.ModelSerializer):
     """
-    Updates product details. Seller only.
+    Updates product details. Seller only 
     PATCH /products/<id>/
     """
 
     class Meta:
-        model  = Product
+        model = Product
         fields = [
-            'category', 'name', 'description', 'short_description',
-            'price', 'compare_at_price', 'cost_price',
-            'low_stock_threshold', 'weight', 'dimensions',
+            'category', 'name', 'description', 'short_description', 
+            'price', 'compare_at_price', 'cost_price', 
+            'low_stock_threshold', 'weight', 'dimensions', 
             'is_featured', 'is_active', 'is_digital',
         ]
         extra_kwargs = {f: {'required': False} for f in fields}
-
+    
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         return instance
 
-
 class ProductDeleteSerializer(serializers.Serializer):
     """
-    Soft-deletes (deactivates) a product.
+    Soft-deletes (deactivates) a product
     DELETE /products/<id>/
     """
 
     def save(self):
-        product           = self.context['product']
-        product.is_active = False
+        product             = self.context['product']
+        product.is_active   = False
         product.save(update_fields=['is_active'])
-
 
 class ProductDetailSerializer(serializers.ModelSerializer):
     """
-    Complete product page — images, variants, attributes, seller info.
+    Complete product page - images, variants, attributes, seller info.
     GET /products/<slug>/
     """
     images              = serializers.SerializerMethodField()
@@ -305,32 +286,41 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     is_low_stock        = serializers.ReadOnlyField()
 
     class Meta:
-        model  = Product
+        model = Product
         fields = [
-            'id', 'name', 'slug', 'description', 'short_description',
-            'sku', 'barcode',
-            'price', 'compare_at_price', 'cost_price',
-            'discount_percentage',
-            'stock_quantity', 'in_stock', 'is_low_stock',
-            'weight', 'dimensions',
-            'is_featured', 'is_active', 'is_digital',
-            'rating_average', 'review_count', 'view_count', 'sold_count',
-            'category', 'market_name', 'market_slug', 'market_verified',
-            'images', 'variants',
-            'created_at', 'updated_at',
+            'id', 'name', 'slug', 'decription', 'short_description', 
+            'sku', 'barcode', 'price', 'compare_at_price', 'cost_price', 
+            'discount_percentage', 'stock_quantity', 'in_stock', 
+            'is_low_stock', 'weight', 'dimensions', 'is_featured', 'is_active', 'is_digital',
+            'rating_average', 'review_count', 'view_count', 'sold_count', 'category', 'market_name',
+            'market_slug', 'market_verified', 'images', 'variants', 'created_at', 'updated_at',
         ]
         read_only_fields = fields
 
     def get_images(self, obj):
         return ProductImageSerializer(
-            obj.product_images.order_by('order_position'), many=True
+            obj.product_images,order_by('order_position'), many=True
         ).data
-
+    
     def get_variants(self, obj):
         return ProductVariantSerializer(
             obj.product_variants.filter(is_active=True), many=True
         ).data
 
+
+
+
+
+
+
+
+
+
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PRODUCTS
+# ═════════════════════════════════════════════════════════════════════════════
 
 class ProductListSerializer(serializers.ModelSerializer):
     """
