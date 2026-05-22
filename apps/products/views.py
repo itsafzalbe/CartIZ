@@ -217,32 +217,11 @@ class ProductListCreateView(APIView):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# PRODUCTS — CRUD
-# ═════════════════════════════════════════════════════════════════════════════
-
-
-
 class ProductDetailView(APIView):
     """
-    GET    /products/<slug>/    → public product detail (increments view_count)
-    PATCH  /products/<slug>/    → update (owner seller)
-    DELETE /products/<slug>/    → soft-delete (owner seller)
+    GET     /products/<slug>/       -> public product detail (increments the view count)
+    PATCH   /products/<slug>/       -> update (owner seller)
+    DELETE  /products/<slug>/       -> soft-delete (owner seller)
     """
 
     def get_permissions(self):
@@ -251,39 +230,40 @@ class ProductDetailView(APIView):
     def _get(self, slug):
         return get_object_or_404(Product, slug=slug, is_active=True)
 
+    
     def get(self, request, slug):
         product = self._get(slug)
-        # Increment view count
         Product.objects.filter(pk=product.pk).update(view_count=product.view_count + 1)
         return ok("Product retrieved.", data=ProductDetailSerializer(product).data)
-
+    
     def patch(self, request, slug):
         product = self._get(slug)
         if product.market.seller_id != request.user.pk:
-            return forbidden("You don't own this product.")
-        s = ProductUpdateSerializer(product, data=request.data, partial=True)
-        s.is_valid(raise_exception=True)
-        return ok("Product updated.", data=ProductDetailSerializer(s.save()).data)
-
+            return forbidden("You do not own this product.")
+            s = ProductUpdateSerializer(product, data=request.data, partial=True)
+            s.is_valid(raise_exception=True)
+            return ok("Product updated.", data=ProductDetailSerializer(s.save()).data)
+        
     def delete(self, request, slug):
         product = self._get(slug)
         if product.market.seller_id != request.user.pk:
-            return forbidden("You don't own this product.")
+            return forbidden("You don't own this market.")
         ProductDeleteSerializer(data={}, context={"product": product}).save()
         return ok("Product deactivated.")
 
-
 class ProductQuickView(APIView):
-    """GET /products/<slug>/quick-view/"""
-    permission_classes = [AllowAny]
+    """
+    GET /products/<slug>/quick-view/
+    """
 
+    permission_classes = [AllowAny]
     def get(self, request, slug):
         product = get_object_or_404(Product, slug=slug, is_active=True)
         return ok("Quick view data retrieved.", data=ProductQuickViewSerializer(product).data)
 
 
 class ProductStatsView(APIView):
-    """GET /products/<slug>/stats/ — seller only."""
+    """GET /products/<slug>/stats/ - seller only."""
     permission_classes = [IsSellerOnly]
 
     def get(self, request, slug):
@@ -298,7 +278,9 @@ class ProductStatsView(APIView):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class SellerProductListView(APIView):
-    """GET /products/my-products/ — seller's management view."""
+    """
+    GET /products/my-products/ - seller's management view.
+    """
     permission_classes = [IsSellerOnly]
 
     def get(self, request):
@@ -307,6 +289,27 @@ class SellerProductListView(APIView):
             return not_found("You don't have an active market.")
         qs = market.products.all().order_by('-created_at')
         return ok("Your products retrieved.", data={"count": qs.count(), "products": ProductSellerSerializer(qs, many=True).data})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -440,27 +443,7 @@ class ProductImageBulkUploadView(APIView):
         product = get_object_or_404(Product, slug=slug, is_active=True)
         if product.market.seller_id != request.user.pk:
             return forbidden()
-        s = ProductImageBulkUploclass ProductListCreateView(APIView):
-    """
-    GET  /products/            → list all active products (with filters)
-    POST /products/            → create product (seller)
-    """
-
-    def get_permissions(self):
-        return [IsSellerOnly()] if self.request.method == 'POST' else [AllowAny()]
-
-    def get(self, request):
-        qs = Product.objects.filter(is_active=True).select_related('market', 'category')
-        filter_s = ProductFilterSerializer(data=request.query_params)
-        if filter_s.is_valid():
-            qs = _apply_filters(qs, filter_s.validated_data)
-        return ok("Products retrieved.", data={"count": qs.count(), "products": ProductListSerializer(qs, many=True).data})
-
-    def post(self, request):
-        s = ProductCreateSerializer(data=request.data, context={"request": request})
-        s.is_valid(raise_exception=True)
-        product = s.save()
-        return created("Product created.", data=ProductDetailSerializer(product).data)adSerializer(data=request.data, context={"product": product})
+        s = ProductImageBulkUploadSerializer(data=request.data, context={"product": product})
         s.is_valid(raise_exception=True)
         images = s.save()
         return created(f"{len(images)} image(s) uploaded.", data=ProductImageListSerializer(images, many=True).data)

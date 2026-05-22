@@ -227,7 +227,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         if Product.objects.filter(market=market, sku=sku).exists():
             raise serializers.ValidationError({"sku": "A product with this SKU already exists in your market."})
 
-        barcode = attrs.get('barcode'. '')
+        barcode = attrs.get('barcode', '')
         if Product.objects.filter(market=market, barcode=barcode).exists():
             raise serializers.ValidationError({"barcode": "A product with this barcode already exists in your market."})
             
@@ -299,13 +299,127 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 
     def get_images(self, obj):
         return ProductImageSerializer(
-            obj.product_images,order_by('order_position'), many=True
+            obj.product_images.order_by('order_position'), many=True
         ).data
     
     def get_variants(self, obj):
         return ProductVariantSerializer(
             obj.product_variants.filter(is_active=True), many=True
         ).data
+
+
+class ProductListSerializer(serializers.ModelSerializer):
+    """
+    Minimal product data optimised for listing pages.
+    GET /products/
+    """
+
+    primary_image = serializers.SerializerMethodField()
+    discount_percentage = serializers.ReadOnlyField()
+    in_stock = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'name', 'slug', 'price', 'compare_at_price', 'discount_percentage', 
+            'in_stock', 'rating_average', 'review_count', 'primary_image', 
+            'is_featured',        
+        ]
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+
+class ProductCardSerializer(serializers.ModelSerializer):
+    """
+    Product card for grid / list views.
+    """
+
+    primary_image       = serializers.SerializerMethodField()
+    discount_percentage = serializers.ReadOnlyField()
+    in_stock            = serializers.ReadOnlyField()
+    market_name         = serializers.CharField(source='market.market_name', read_only=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'name', 'slug', 'price', 'compare_at_price', 'discount_percentage',
+            'rating_average', 'review_count', 'in_stock', 'is_featured', 'primary_image',
+            'market_name', 
+        ]
+        read_only_fields = fields
+
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+    
+
+class ProductSearchSerializer(serializers.ModelSerializer):
+    """
+    Search result item - minimal data for fast rendering.
+    """
+    primary_image = serializers.SerializerMethodField()
+    in_stock      = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'rating_average', 'primary_image', 'in_stock']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+
+class ProductSellerSerializer(serializers.ModelSerializer):
+    """
+    Product from the seller's management dashboard - includes cost and stock
+    GET /products/my-products/
+    """
+    primary_image = serializers.SerializerMethodField()
+    is_low_stcok = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'name', 'slug', 'sku', 'barcode', 
+            'price', 'cost_price', 'compare_at_price',
+            'stock_quantity', 'is_low_stock', 'rating_average', 
+            'review_count', 'sold_count', 'view_count', 'is_active', 
+            'is_featured', 'primary_image', 'created_at',
+        ]
+        read_only_fileds = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+    
+
+class ProductPublicSerializer(serializers.ModelSerializer):
+    """Product as buyers see it - no cost_price"""
+
+    primary_image       = serializers.SerializerMethodField()
+    discount_percentage = serializers.ReadOnlyField()
+    in_stock            = serializers.ReadOnlyField()
+    category_name       = serializers.CharField(source='category.name', read_only=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'name', 'slug', 'description', 'short_description',
+            'price', 'compare_at_price', 'discount_percentage', 
+            'stock_quantity', 'in_stock', 'rating_average', 'review_count', 'sold_count',
+            'is_digital', 'category_name', 'primary_image',
+        ]
+        read_only_fields = fields
+
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+
+
+
+
+
+
+
+
+
 
 
 
@@ -321,112 +435,6 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 # ═════════════════════════════════════════════════════════════════════════════
 # PRODUCTS
 # ═════════════════════════════════════════════════════════════════════════════
-
-class ProductListSerializer(serializers.ModelSerializer):
-    """
-    Minimal product data optimised for listing pages.
-    GET /products/
-    """
-    primary_image       = serializers.SerializerMethodField()
-    discount_percentage = serializers.ReadOnlyField()
-    in_stock            = serializers.ReadOnlyField()
-
-    class Meta:
-        model  = Product
-        fields = [
-            'id', 'name', 'slug', 'price', 'compare_at_price',
-            'discount_percentage', 'in_stock',
-            'rating_average', 'review_count',
-            'primary_image', 'is_featured',
-        ]
-        read_only_fields = fields
-
-    def get_primary_image(self, obj):
-        return _primary_image(obj)
-
-
-class ProductCardSerializer(serializers.ModelSerializer):
-    """Product card for grid / list views."""
-    primary_image       = serializers.SerializerMethodField()
-    discount_percentage = serializers.ReadOnlyField()
-    in_stock            = serializers.ReadOnlyField()
-    market_name         = serializers.CharField(source='market.market_name', read_only=True)
-
-    class Meta:
-        model  = Product
-        fields = [
-            'id', 'name', 'slug',
-            'price', 'compare_at_price', 'discount_percentage',
-            'rating_average', 'review_count',
-            'in_stock', 'is_featured',
-            'primary_image', 'market_name',
-        ]
-        read_only_fields = fields
-
-    def get_primary_image(self, obj):
-        return _primary_image(obj)
-
-
-class ProductSearchSerializer(serializers.ModelSerializer):
-    """Search result item — minimal data for fast rendering."""
-    primary_image = serializers.SerializerMethodField()
-    in_stock      = serializers.ReadOnlyField()
-
-    class Meta:
-        model  = Product
-        fields = ['id', 'name', 'slug', 'price', 'rating_average', 'primary_image', 'in_stock']
-        read_only_fields = fields
-
-    def get_primary_image(self, obj):
-        return _primary_image(obj)
-
-
-class ProductSellerSerializer(serializers.ModelSerializer):
-    """
-    Product from the seller's management dashboard — includes cost and stock.
-    GET /products/my-products/
-    """
-    primary_image = serializers.SerializerMethodField()
-    is_low_stock  = serializers.ReadOnlyField()
-
-    class Meta:
-        model  = Product
-        fields = [
-            'id', 'name', 'slug', 'sku', 'barcode',
-            'price', 'cost_price', 'compare_at_price',
-            'stock_quantity', 'is_low_stock',
-            'rating_average', 'review_count',
-            'sold_count', 'view_count',
-            'is_active', 'is_featured',
-            'primary_image', 'created_at',
-        ]
-        read_only_fields = fields
-
-    def get_primary_image(self, obj):
-        return _primary_image(obj)
-
-
-class ProductPublicSerializer(serializers.ModelSerializer):
-    """Product as buyers see it — no cost_price."""
-    primary_image       = serializers.SerializerMethodField()
-    discount_percentage = serializers.ReadOnlyField()
-    in_stock            = serializers.ReadOnlyField()
-    category_name       = serializers.CharField(source='category.name', read_only=True)
-
-    class Meta:
-        model  = Product
-        fields = [
-            'id', 'name', 'slug', 'description', 'short_description',
-            'price', 'compare_at_price', 'discount_percentage',
-            'stock_quantity', 'in_stock',
-            'rating_average', 'review_count', 'sold_count',
-            'is_digital', 'category_name',
-            'primary_image',
-        ]
-        read_only_fields = fields
-
-    def get_primary_image(self, obj):
-        return _primary_image(obj)
 
 
 class ProductQuickViewSerializer(serializers.ModelSerializer):
