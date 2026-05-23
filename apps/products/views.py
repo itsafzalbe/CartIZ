@@ -333,49 +333,28 @@ class LowStockProductsView(APIView):
         )
         return ok("Low stock products retrieved.", data={"count": qs.count(), "products": ProductLowStockSerializer(qs, many=True).data})
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ═════════════════════════════════════════════════════════════════════════════
 # IMAGES
 # ═════════════════════════════════════════════════════════════════════════════
 
 class ProductImageListCreateView(APIView):
     """
-    GET  /products/<slug>/images/
-    POST /products/<slug>/images/   → upload image (seller)
+    GET /products/<slug>/images/
+    POST /products/<slug>/images/   -> uploaf image (seller)
     """
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_permissions(self):
         return [IsSellerOnly()] if self.request.method == 'POST' else [AllowAny()]
-
+    
     def _get_product(self, slug):
         return get_object_or_404(Product, slug=slug, is_active=True)
-
+    
     def get(self, request, slug):
         product = self._get_product(slug)
-        images  = product.product_images.order_by('order_position')
+        images = product.product_images.order_by('order_position')
         return ok("Images retrieved.", data={"images": ProductImageListSerializer(images, many=True).data})
-
+    
     def post(self, request, slug):
         product = self._get_product(slug)
         if product.market.seller_id != request.user.pk:
@@ -388,18 +367,19 @@ class ProductImageListCreateView(APIView):
 
 class ProductImageDetailView(APIView):
     """
-    PATCH  /products/images/<pk>/
+    PATCH /products/images/<pk>/
     DELETE /products/images/<pk>/
     """
+
     permission_classes = [IsSellerOnly]
-    parser_classes     = [MultiPartParser, FormParser, JSONParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def _get(self, pk, user):
         img = get_object_or_404(ProductImage, pk=pk)
         if img.product.market.seller_id != user.pk:
             return None, forbidden()
         return img, None
-
+    
     def patch(self, request, pk):
         img, err = self._get(pk, request.user)
         if err:
@@ -407,7 +387,7 @@ class ProductImageDetailView(APIView):
         s = ProductImageUpdateSerializer(img, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
         return ok("Image updated.", data=ProductImageSerializer(s.save()).data)
-
+    
     def delete(self, request, pk):
         img, err = self._get(pk, request.user)
         if err:
@@ -420,7 +400,6 @@ class ProductImageDetailView(APIView):
 
 class SetPrimaryImageView(APIView):
     """PATCH /products/images/<pk>/set-primary/"""
-    permission_classes = [IsSellerOnly]
 
     def patch(self, request, pk):
         img = get_object_or_404(ProductImage, pk=pk)
@@ -429,11 +408,10 @@ class SetPrimaryImageView(APIView):
         SetPrimaryImageSerializer(data={}, context={"image": img}).save()
         return ok("Primary image updated.")
 
-
 class ProductImageBulkUploadView(APIView):
     """POST /products/<slug>/images/bulk/"""
     permission_classes = [IsSellerOnly]
-    parser_classes     = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request, slug):
         product = get_object_or_404(Product, slug=slug, is_active=True)
@@ -445,27 +423,28 @@ class ProductImageBulkUploadView(APIView):
         return created(f"{len(images)} image(s) uploaded.", data=ProductImageListSerializer(images, many=True).data)
 
 
+
 # ═════════════════════════════════════════════════════════════════════════════
 # VARIANTS
 # ═════════════════════════════════════════════════════════════════════════════
 
 class ProductVariantListCreateView(APIView):
     """
-    GET  /products/<slug>/variants/
-    POST /products/<slug>/variants/   → create variant (seller)
+    GET /products/<slug>/variants/
+    POST /products/<slug>/variants/     -> create variant seller only
     """
 
     def get_permissions(self):
         return [IsSellerOnly()] if self.request.method == 'POST' else [AllowAny()]
-
+    
     def _get_product(self, slug):
         return get_object_or_404(Product, slug=slug, is_active=True)
-
+    
     def get(self, request, slug):
-        product  = self._get_product(slug)
+        product = self._get_product(slug)
         variants = product.product_variants.filter(is_active=True)
         return ok("Variants retrieved.", data={"variants": ProductVariantListSerializer(variants, many=True).data})
-
+    
     def post(self, request, slug):
         product = self._get_product(slug)
         if product.market.seller_id != request.user.pk:
@@ -474,24 +453,24 @@ class ProductVariantListCreateView(APIView):
         s.is_valid(raise_exception=True)
         variant = s.save()
         return created("Variant created.", data=ProductVariantSerializer(variant).data)
-
+        
 
 class ProductVariantDetailView(APIView):
     """
-    GET    /products/variants/<pk>/
-    PATCH  /products/variants/<pk>/
-    DELETE /products/variants/<pk>/
+    GET     /products/variatns/<pk>/
+    PATCH   /products/variatns/<pk>/
+    DELETE  /products/variatns/<pk>/
     """
 
     def get_permissions(self):
         return [AllowAny()] if self.request.method == 'GET' else [IsSellerOnly()]
-
+    
     def _get(self, pk):
         return get_object_or_404(ProductVariant, pk=pk)
-
+    
     def get(self, request, pk):
         return ok("Variant retrieved.", data=ProductVariantSerializer(self._get(pk)).data)
-
+    
     def patch(self, request, pk):
         variant = self._get(pk)
         if variant.product.market.seller_id != request.user.pk:
@@ -499,7 +478,7 @@ class ProductVariantDetailView(APIView):
         s = ProductVariantUpdateSerializer(variant, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
         return ok("Variant updated.", data=ProductVariantSerializer(s.save()).data)
-
+    
     def delete(self, request, pk):
         variant = self._get(pk)
         if variant.product.market.seller_id != request.user.pk:
@@ -517,6 +496,25 @@ class ProductVariantStockView(APIView):
         if variant.product.market.seller_id != request.user.pk:
             return forbidden()
         return ok("Variant stock retrieved.", data=ProductVariantStockSerializer(variant).data)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ═════════════════════════════════════════════════════════════════════════════

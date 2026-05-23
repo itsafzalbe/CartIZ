@@ -538,45 +538,27 @@ class ProductTopRatedSerializer(serializers.ModelSerializer):
         return _primary_image(obj)
     
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ═════════════════════════════════════════════════════════════════════════════
 # PRODUCT STOCK
 # ═════════════════════════════════════════════════════════════════════════════
-
 class ProductStockSerializer(serializers.ModelSerializer):
-    """Current stock info for a product."""
+    """Current stock info for a product"""
     is_low_stock = serializers.ReadOnlyField()
     in_stock     = serializers.ReadOnlyField()
-
+    
     class Meta:
-        model  = Product
+        model = Product
         fields = ['id', 'name', 'sku', 'stock_quantity', 'low_stock_threshold', 'is_low_stock', 'in_stock']
         read_only_fields = fields
 
-
 class ProductStockUpdateSerializer(serializers.ModelSerializer):
     """
-    Updates product quantity. Seller only.
+    Updates product quantity. seller only
     PATCH /products/<id>/stock/
     """
 
     class Meta:
-        model  = Product
+        model = Product
         fields = ['stock_quantity', 'low_stock_threshold']
         extra_kwargs = {f: {'required': False} for f in fields}
 
@@ -586,16 +568,14 @@ class ProductStockUpdateSerializer(serializers.ModelSerializer):
         instance.save(update_fields=list(validated_data.keys()))
         return instance
 
-
 class ProductLowStockSerializer(serializers.ModelSerializer):
-    """Products below their low_stock_threshold."""
+    """Products below their low_stock_threshold"""
     is_low_stock = serializers.ReadOnlyField()
 
     class Meta:
-        model  = Product
+        model = Product
         fields = ['id', 'name', 'sku', 'stock_quantity', 'low_stock_threshold', 'is_low_stock']
         read_only_fields = fields
-
 
 # ═════════════════════════════════════════════════════════════════════════════
 # PRODUCT IMAGES
@@ -603,37 +583,36 @@ class ProductLowStockSerializer(serializers.ModelSerializer):
 
 class ProductImageSerializer(serializers.ModelSerializer):
     """Full image detail."""
+
     image_url = serializers.SerializerMethodField()
 
     class Meta:
-        model  = ProductImage
+        model = ProductImage
         fields = ['id', 'image_url', 'alt_text', 'is_primary', 'order_position', 'created_at']
         read_only_fields = fields
-
+    
     def get_image_url(self, obj):
         return obj.image.url if obj.image else None
 
-
 class ProductImageCreateSerializer(serializers.ModelSerializer):
     """
-    Uploads a new product image.
+    Uploads a new product image
     POST /products/<id>/images/
     """
 
     class Meta:
-        model  = ProductImage
+        model = ProductImage
         fields = ['image', 'alt_text', 'is_primary', 'order_position']
-
+    
     def validate(self, attrs):
         product = self.context['product']
         if attrs.get('is_primary'):
-            # Will be handled atomically in create
             pass
         return attrs
-
+    
     def create(self, validated_data):
         from django.db import transaction
-        product    = self.context['product']
+        product = self.context['product']
         is_primary = validated_data.get('is_primary', False)
 
         with transaction.atomic():
@@ -641,15 +620,13 @@ class ProductImageCreateSerializer(serializers.ModelSerializer):
                 ProductImage.objects.filter(product=product, is_primary=True).update(is_primary=False)
             return ProductImage.objects.create(product=product, **validated_data)
 
-
 class ProductImageUpdateSerializer(serializers.ModelSerializer):
     """
-    Updates alt_text, order_position.
+    Updates alt_text, order_positon
     PATCH /products/images/<id>/
     """
-
     class Meta:
-        model  = ProductImage
+        model = ProductImage
         fields = ['alt_text', 'order_position']
         extra_kwargs = {f: {'required': False} for f in fields}
 
@@ -659,45 +636,42 @@ class ProductImageUpdateSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
-
 class ProductImageDeleteSerializer(serializers.Serializer):
     """Deletes a product image. Cannot delete the only image."""
 
     def validate(self, attrs):
-        image   = self.context['image']
+        image = self.context['image']
         product = image.product
         if product.product_images.count() <= 1:
-            raise serializers.ValidationError("Cannot delete the only product image.")
+            raise serializers.ValidationError("Cannot delete the only product image")
         return attrs
-
+    
     def save(self):
         image = self.context['image']
         image.image.delete(save=False)
         image.delete()
 
-
 class ProductImageListSerializer(serializers.ModelSerializer):
-    """All images for a product."""
+    """All images for a product"""
     image_url = serializers.SerializerMethodField()
 
     class Meta:
-        model  = ProductImage
+        model = ProductImage
         fields = ['id', 'image_url', 'alt_text', 'is_primary', 'order_position']
         read_only_fields = fields
-
+    
     def get_image_url(self, obj):
         return obj.image.url if obj.image else None
 
-
 class SetPrimaryImageSerializer(serializers.Serializer):
     """
-    Sets a product image as primary.
+    Sets a product image as primary
     PATCH /products/images/<id>/set-primary/
     """
 
     def save(self):
         from django.db import transaction
-        image   = self.context['image']
+        image = self.context['image']
         product = image.product
         with transaction.atomic():
             ProductImage.objects.filter(product=product, is_primary=True).update(is_primary=False)
@@ -707,7 +681,7 @@ class SetPrimaryImageSerializer(serializers.Serializer):
 
 class ProductImageBulkUploadSerializer(serializers.Serializer):
     """
-    Bulk upload multiple images for a product.
+    Bulk upload multiple images for a product
     POST /products/<id>/images/bulk/
     """
     images = serializers.ListField(child=serializers.ImageField(), min_length=1, max_length=10)
@@ -719,25 +693,25 @@ class ProductImageBulkUploadSerializer(serializers.Serializer):
         with transaction.atomic():
             for i, img in enumerate(self.validated_data['images']):
                 created.append(ProductImage.objects.create(
-                    product=product,
-                    image=img,
+                    product = product,
+                    image = img,
                     order_position=i,
                 ))
         return created
-
 
 # ═════════════════════════════════════════════════════════════════════════════
 # PRODUCT VARIANTS
 # ═════════════════════════════════════════════════════════════════════════════
 
 class ProductVariantSerializer(serializers.ModelSerializer):
-    """Full variant details."""
-    in_stock      = serializers.ReadOnlyField()
-    low_in_stock  = serializers.ReadOnlyField()
-    image_url     = serializers.SerializerMethodField()
+    """full variant details"""
+
+    in_stock = serializers.ReadOnlyField()
+    low_in_stock = serializers.ReadOnlyField()
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
-        model  = ProductVariant
+        model = ProductVariant
         fields = [
             'id', 'variant_name', 'sku', 'price',
             'stock_quantity', 'in_stock', 'low_in_stock',
@@ -745,86 +719,106 @@ class ProductVariantSerializer(serializers.ModelSerializer):
             'created_at',
         ]
         read_only_fields = fields
-
+    
     def get_image_url(self, obj):
         return obj.image.url if obj.image else None
 
 
 class ProductVariantCreateSerializer(serializers.ModelSerializer):
     """
-    Creates a new product variant. Seller only.
+    Creates a new product variant. Seller only
     POST /products/<id>/variants/
     """
 
     class Meta:
-        model  = ProductVariant
+        model = ProductVariant
         fields = ['variant_name', 'sku', 'price', 'stock_quantity', 'attributes', 'image', 'is_active']
         extra_kwargs = {
             'variant_name': {'required': True},
             'sku':          {'required': True},
-            'price':        {'required': True},
-        }
+            'price':        {'required': True}, 
 
+        }
+    
     def validate_sku(self, value):
         product = self.context['product']
         if ProductVariant.objects.filter(product=product, sku=value).exists():
-            raise serializers.ValidationError("A variant with this SKU already exists for this product.")
+            raise serializers.ValidationError("A variant witht this SKlu already exists for this product")
         return value
-
+    
     def create(self, validated_data):
         return ProductVariant.objects.create(product=self.context['product'], **validated_data)
 
-
 class ProductVariantUpdateSerializer(serializers.ModelSerializer):
     """
-    Updates variant details. Seller only.
+    Updates variant details. Seller only
     PATCH /products/variants/<id>/
     """
 
     class Meta:
-        model  = ProductVariant
+        model = ProductVariant
         fields = ['variant_name', 'price', 'stock_quantity', 'attributes', 'image', 'is_active']
         extra_kwargs = {f: {'required': False} for f in fields}
-
+    
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         return instance
 
-
 class ProductVariantDeleteSerializer(serializers.Serializer):
     """Deactivates a variant."""
 
     def save(self):
-        variant           = self.context['variant']
+        variant = self.context['variant']
         variant.is_active = False
         variant.save(update_fields=['is_active'])
 
-
 class ProductVariantListSerializer(serializers.ModelSerializer):
-    """Lightweight variant list — price, stock, attributes."""
-    in_stock  = serializers.ReadOnlyField()
+    """Lightweight variant list - price, stock, attributes."""
+    in_stock = serializers.ReadOnlyField()
     image_url = serializers.SerializerMethodField()
 
     class Meta:
-        model  = ProductVariant
+        model = ProductVariant
         fields = ['id', 'variant_name', 'sku', 'price', 'stock_quantity', 'in_stock', 'attributes', 'image_url']
         read_only_fields = fields
-
+    
     def get_image_url(self, obj):
         return obj.image.url if obj.image else None
 
 
 class ProductVariantStockSerializer(serializers.ModelSerializer):
-    """Variant stock info for inventory management."""
-    in_stock     = serializers.ReadOnlyField()
+    """
+    Variant stock info for inventory management.
+    """
+    in_stock = serializers.ReadOnlyField()
     low_in_stock = serializers.ReadOnlyField()
 
     class Meta:
-        model  = ProductVariant
+        model = ProductVariant
         fields = ['id', 'variant_name', 'sku', 'stock_quantity', 'in_stock', 'low_in_stock']
         read_only_fields = fields
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ═════════════════════════════════════════════════════════════════════════════
