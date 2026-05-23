@@ -289,37 +289,13 @@ class SellerProductListView(APIView):
             return not_found("You don't have an active market.")
         qs = market.products.all().order_by('-created_at')
         return ok("Your products retrieved.", data={"count": qs.count(), "products": ProductSellerSerializer(qs, many=True).data})
+    
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# STOCK
-# ═════════════════════════════════════════════════════════════════════════════
 
 class ProductStockView(APIView):
     """
-    GET   /products/<slug>/stock/
-    PATCH /products/<slug>/stock/   → update stock (seller)
+    GET /products/<slug>/stock/
+    PATCH /products/<slug>/stock/   -> updates stock (seller)
     """
     permission_classes = [IsSellerOnly]
 
@@ -328,13 +304,13 @@ class ProductStockView(APIView):
         if product.market.seller_id != user.pk:
             return None, forbidden()
         return product, None
-
+    
     def get(self, request, slug):
         product, err = self._get(slug, request.user)
         if err:
             return err
         return ok("Stock info retrieved.", data=ProductStockSerializer(product).data)
-
+    
     def patch(self, request, slug):
         product, err = self._get(slug, request.user)
         if err:
@@ -345,17 +321,37 @@ class ProductStockView(APIView):
 
 
 class LowStockProductsView(APIView):
-    """GET /products/my-products/low-stock/ — seller only."""
+    """GET /products/my-products/low-stock/         -> seller only"""
     permission_classes = [IsSellerOnly]
 
     def get(self, request):
         market = request.user.markets.filter(is_active=True).first()
         if not market:
-            return not_found("You don't have an active market.")
+            return not_found("You do not have an active market.")
         qs = market.products.filter(is_active=True).extra(
             where=["stock_quantity <= low_stock_threshold"]
         )
         return ok("Low stock products retrieved.", data={"count": qs.count(), "products": ProductLowStockSerializer(qs, many=True).data})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ═════════════════════════════════════════════════════════════════════════════

@@ -413,50 +413,27 @@ class ProductPublicSerializer(serializers.ModelSerializer):
         return _primary_image(obj)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# PRODUCTS
-# ═════════════════════════════════════════════════════════════════════════════
-
-
 class ProductQuickViewSerializer(serializers.ModelSerializer):
-    """Quick view modal — limited data loaded on hover/click."""
-    primary_image       = serializers.SerializerMethodField()
-    variants            = serializers.SerializerMethodField()
+    """Quick view model - limited data loaded on hover or click"""
+
+    primary_image  = serializers.SerializerMethodField()
+    variants = serializers.SerializerMethodField()
     discount_percentage = serializers.ReadOnlyField()
-    in_stock            = serializers.ReadOnlyField()
+    in_stock = serializers.ReadOnlyField()
 
     class Meta:
-        model  = Product
+        model = Product
         fields = [
             'id', 'name', 'slug', 'short_description',
-            'price', 'compare_at_price', 'discount_percentage',
-            'in_stock', 'rating_average', 'review_count',
+            'price', 'compare_at_price', 'discount_percentage', 
+            'in_stock', 'rating_average', 'review_count', 
             'primary_image', 'variants',
         ]
         read_only_fields = fields
-
+    
     def get_primary_image(self, obj):
         return _primary_image(obj)
-
+    
     def get_variants(self, obj):
         return ProductVariantListSerializer(
             obj.product_variants.filter(is_active=True), many=True
@@ -464,18 +441,18 @@ class ProductQuickViewSerializer(serializers.ModelSerializer):
 
 
 class ProductRelatedSerializer(serializers.ModelSerializer):
-    """Related / similar products — same category, different product."""
-    primary_image       = serializers.SerializerMethodField()
+    """Related or similar products - same category, different product"""
+    primary_image = serializers.SerializerMethodField()
     discount_percentage = serializers.ReadOnlyField()
 
     class Meta:
-        model  = Product
-        fields = ['id', 'name', 'slug', 'price', 'discount_percentage', 'rating_average', 'primary_image']
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'discount_percentage', 'rating_average', 'primary_image',]
         read_only_fields = fields
-
+    
     def get_primary_image(self, obj):
         return _primary_image(obj)
-
+    
 
 class ProductStatsSerializer(serializers.Serializer):
     """
@@ -485,80 +462,96 @@ class ProductStatsSerializer(serializers.Serializer):
 
     def to_representation(self, instance: Product):
         return {
-            'view_count':    instance.view_count,
-            'sold_count':    instance.sold_count,
-            'review_count':  instance.review_count,
-            'rating_average': str(instance.rating_average),
-            'stock_quantity': instance.stock_quantity,
-            'is_low_stock':   instance.is_low_stock,
-            'in_stock':       instance.in_stock,
+            'view_count':       instance.view_count,
+            'sold_count':       instance.sold_count,
+            'review_count':     instance.review_count,
+            'rating_average':   str(instance.rating_average),
+            'stock_quantity':   instance.stock_quantity,
+            'is_low_stock':     instance.is_low_stock,
+            'in_stock':         instance.in_stock,
         }
 
-
 class ProductFeaturedSerializer(serializers.ModelSerializer):
-    """Featured products for the homepage."""
-    primary_image       = serializers.SerializerMethodField()
+    """Featured products for the homepage"""
+
+    primary_image = serializers.SerializerMethodField()
     discount_percentage = serializers.ReadOnlyField()
 
     class Meta:
-        model  = Product
+        model = Product
         fields = ['id', 'name', 'slug', 'price', 'compare_at_price', 'discount_percentage', 'rating_average', 'primary_image']
         read_only_fields = fields
 
     def get_primary_image(self, obj):
         return _primary_image(obj)
-
-
+    
 class ProductBestSellerSerializer(serializers.ModelSerializer):
-    """Best-selling products sorted by sold_count."""
+    """Best selling product sorted by sold_count"""
+
     primary_image = serializers.SerializerMethodField()
 
     class Meta:
-        model  = Product
+        model = Product
         fields = ['id', 'name', 'slug', 'price', 'sold_count', 'rating_average', 'primary_image']
         read_only_fields = fields
 
     def get_primary_image(self, obj):
         return _primary_image(obj)
 
-
 class ProductNewArrivalSerializer(serializers.ModelSerializer):
-    """Newly added products."""
+    """New added products."""
+
     primary_image = serializers.SerializerMethodField()
 
     class Meta:
-        model  = Product
+        model = Product
         fields = ['id', 'name', 'slug', 'price', 'rating_average', 'primary_image', 'created_at']
         read_only_fields = fields
 
     def get_primary_image(self, obj):
         return _primary_image(obj)
-
-
+    
 class ProductTrendingSerializer(serializers.ModelSerializer):
-    """Trending products sorted by view_count."""
+    """Trending products sorted by view_count"""
+
     primary_image = serializers.SerializerMethodField()
 
     class Meta:
-        model  = Product
+        model = Product
         fields = ['id', 'name', 'slug', 'price', 'view_count', 'rating_average', 'primary_image']
         read_only_fields = fields
 
     def get_primary_image(self, obj):
         return _primary_image(obj)
-
-
+    
 class ProductTopRatedSerializer(serializers.ModelSerializer):
-    """Highest-rated products."""
+    """Highest-rated products"""
+
     primary_image = serializers.SerializerMethodField()
 
     class Meta:
-        model  = Product
+        model = Product
         fields = ['id', 'name', 'slug', 'price', 'rating_average', 'review_count', 'primary_image']
         read_only_fields = fields
 
     def get_primary_image(self, obj):
         return _primary_image(obj)
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ═════════════════════════════════════════════════════════════════════════════
