@@ -498,42 +498,23 @@ class ProductVariantStockView(APIView):
         return ok("Variant stock retrieved.", data=ProductVariantStockSerializer(variant).data)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ═════════════════════════════════════════════════════════════════════════════
 # ATTRIBUTES
 # ═════════════════════════════════════════════════════════════════════════════
 
 class AttributeListCreateView(APIView):
     """
-    GET  /products/attributes/
-    POST /products/attributes/   → admin only
+    GET /products/attributes/
+    POST /products/attributes/  -> admin only
     """
 
     def get_permissions(self):
         return [IsAdminUser()] if self.request.method == 'POST' else [AllowAny()]
-
+    
     def get(self, request):
         attrs = ProductAttribute.objects.all().order_by('name')
         return ok("Attributes retrieved.", data={"attributes": ProductAttributeListSerializer(attrs, many=True).data})
-
+    
     def post(self, request):
         s = ProductAttributeCreateSerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -543,75 +524,70 @@ class AttributeListCreateView(APIView):
 
 class AttributeDetailView(APIView):
     """
-    GET    /products/attributes/<pk>/
-    PATCH  /products/attributes/<pk>/   → admin
-    DELETE /products/attributes/<pk>/   → admin
+    GET     /products/attributes/<pk>/
+    PATCH   /products/attributes/<pk>/  -> admin only
+    DELETE  /products/attributes/<pk>/  -> admin only
     """
 
     def get_permissions(self):
         return [AllowAny()] if self.request.method == 'GET' else [IsAdminUser()]
-
+    
     def _get(self, pk):
         return get_object_or_404(ProductAttribute, pk=pk)
-
+    
     def get(self, request, pk):
         return ok("Attribute retrieved.", data=ProductAttributeSerializer(self._get(pk)).data)
-
+    
     def patch(self, request, pk):
         attr = self._get(pk)
-        s    = ProductAttributeUpdateSerializer(attr, data=request.data, partial=True)
+        s = ProductAttributeUpdateSerializer(attr, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
         return ok("Attribute updated.", data=ProductAttributeSerializer(s.save()).data)
-
+    
     def delete(self, request, pk):
         attr = self._get(pk)
         ProductAttributeDeleteSerializer(data={}, context={"attribute": attr}).save()
         return ok("Attribute deleted.")
-
-
+    
 class AttributeValueListCreateView(APIView):
     """
-    GET  /products/attributes/<pk>/values/
-    POST /products/attributes/<pk>/values/   → admin
+    GET     /products/attributes/<pk>/values/
+    POST    /products/attributes/<pk>/values/   -> admin
     """
 
     def get_permissions(self):
         return [IsAdminUser()] if self.request.method == 'POST' else [AllowAny()]
-
+    
     def get(self, request, pk):
-        attr   = get_object_or_404(ProductAttribute, pk=pk)
+        attr = get_object_or_404(ProductAttribute, pk=pk)
         values = attr.values.order_by('value')
         return ok("Attribute values retrieved.", data={"values": ProductAttributeValueListSerializer(values, many=True).data})
 
     def post(self, request, pk):
         attr = get_object_or_404(ProductAttribute, pk=pk)
-        s    = ProductAttributeValueCreateSerializer(data=request.data, context={"attribute": attr})
+        s = ProductAttributeCreateSerializer(data=request.data, context={"attribute": attr})
         s.is_valid(raise_exception=True)
         value = s.save()
         return created("Attribute value created.", data=ProductAttributeValueSerializer(value).data)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# REVIEWS
-# ═════════════════════════════════════════════════════════════════════════════
-
 class ProductReviewListCreateView(APIView):
     """
-    GET  /products/<slug>/reviews/
-    POST /products/<slug>/reviews/   → authenticated users
+    GET     /products/<slug>/reviews/
+    POST    /products/<slug>/reviews/ -> authenticated users only
     """
 
     def get_permissions(self):
-        return [IsAuthenticated()] if self.request.method == 'POST' else [AllowAny()]
-
+        return [IsAuthenticated()] if self.request.method == 'POST' else[AllowAny()]
+    
     def _get_product(self, slug):
         return get_object_or_404(Product, slug=slug, is_active=True)
-
+    
     def get(self, request, slug):
         product = self._get_product(slug)
         reviews = product.reviews.filter(is_approved=True).order_by('-created_at')
         return ok("Reviews retrieved.", data={"count": reviews.count(), "reviews": ProductReviewListSerializer(reviews, many=True).data})
-
+    
     def post(self, request, slug):
         product = self._get_product(slug)
         s = ProductReviewCreateSerializer(data=request.data, context={"request": request, "product": product})
@@ -619,38 +595,36 @@ class ProductReviewListCreateView(APIView):
         review = s.save()
         return created("Review submitted. It will appear after approval.", data=ProductReviewSerializer(review).data)
 
-
 class ProductReviewDetailView(APIView):
     """
-    GET    /products/reviews/<pk>/
-    PATCH  /products/reviews/<pk>/
-    DELETE /products/reviews/<pk>/
+    GET     /products/reviews/<pk>/
+    PATCH   /products/reviews/<pk>/
+    DELETE  /products/reviews/<pk>/
     """
 
     def get_permissions(self):
         return [AllowAny()] if self.request.method == 'GET' else [IsAuthenticated()]
-
+    
     def _get(self, pk):
         return get_object_or_404(ProductReview, pk=pk)
-
+    
     def get(self, request, pk):
         return ok("Review retrieved.", data=ProductReviewSerializer(self._get(pk)).data)
-
+    
     def patch(self, request, pk):
         review = self._get(pk)
         if review.user_id != request.user.pk:
-            return forbidden("You can only edit your own reviews.")
+            return forbidden("You can only edit your own reviews")
         s = ProductReviewUpdateSerializer(review, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
         return ok("Review updated.", data=ProductReviewSerializer(s.save()).data)
-
+    
     def delete(self, request, pk):
         review = self._get(pk)
         s = ProductReviewDeleteSerializer(data={}, context={"request": request, "review": review})
         s.is_valid(raise_exception=True)
         s.save()
         return ok("Review deleted.")
-
 
 class ProductReviewStatsView(APIView):
     """GET /products/<slug>/reviews/stats/"""
@@ -659,8 +633,7 @@ class ProductReviewStatsView(APIView):
     def get(self, request, slug):
         product = get_object_or_404(Product, slug=slug, is_active=True)
         return ok("Review stats retrieved.", data=ProductReviewStatsSerializer(product).data)
-
-
+    
 class ProductReviewHelpfulView(APIView):
     """POST /products/reviews/<pk>/helpful/"""
     permission_classes = [IsAuthenticated]
@@ -670,7 +643,6 @@ class ProductReviewHelpfulView(APIView):
         ProductReviewHelpfulSerializer(data={}, context={"review": review}).save()
         return ok("Marked as helpful.")
 
-
 class ProductReviewVerifiedView(APIView):
     """GET /products/<slug>/reviews/verified/"""
     permission_classes = [AllowAny]
@@ -679,8 +651,7 @@ class ProductReviewVerifiedView(APIView):
         product = get_object_or_404(Product, slug=slug, is_active=True)
         reviews = product.reviews.filter(is_approved=True, is_verified_purchase=True).order_by('-created_at')
         return ok("Verified reviews retrieved.", data={"count": reviews.count(), "reviews": ProductReviewVerifiedSerializer(reviews, many=True).data})
-
-
+    
 class ProductReviewWithImagesView(APIView):
     """GET /products/<slug>/reviews/with-images/"""
     permission_classes = [AllowAny]
@@ -689,6 +660,24 @@ class ProductReviewWithImagesView(APIView):
         product = get_object_or_404(Product, slug=slug, is_active=True)
         reviews = product.reviews.filter(is_approved=True).order_by('-created_at')
         return ok("Reviews retrieved.", data=ProductReviewWithImagesSerializer(reviews, many=True).data)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ═════════════════════════════════════════════════════════════════════════════

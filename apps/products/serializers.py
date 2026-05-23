@@ -800,27 +800,6 @@ class ProductVariantStockSerializer(serializers.ModelSerializer):
         fields = ['id', 'variant_name', 'sku', 'stock_quantity', 'in_stock', 'low_in_stock']
         read_only_fields = fields
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ═════════════════════════════════════════════════════════════════════════════
 # PRODUCT ATTRIBUTES
 # ═════════════════════════════════════════════════════════════════════════════
@@ -829,73 +808,68 @@ class ProductAttributeValueSerializer(serializers.ModelSerializer):
     """Single attribute value (e.g. 'Red', 'Large')."""
 
     class Meta:
-        model  = ProductAttributeValue
+        model = ProductAttributeValue
         fields = ['id', 'value', 'color_code']
         read_only_fields = fields
 
-
 class ProductAttributeSerializer(serializers.ModelSerializer):
-    """Attribute with its values."""
+    """Attribute with its value"""
     values = ProductAttributeValueSerializer(many=True, read_only=True)
 
     class Meta:
-        model  = ProductAttribute
+        model = ProductAttribute
         fields = ['id', 'name', 'slug', 'values']
         read_only_fields = fields
 
-
 class ProductAttributeCreateSerializer(serializers.ModelSerializer):
-    """Creates a new attribute type. Admin only."""
-
+    """Create a new attribute type. Admin only"""
     class Meta:
-        model  = ProductAttribute
+        model = ProductAttribute
         fields = ['name']
         extra_kwargs = {'name': {'required': True}}
-
+    
     def validate_name(self, value):
         if ProductAttribute.objects.filter(name__iexact=value).exists():
-            raise serializers.ValidationError("This attribute already exists.")
+            raise serializers.ValidationError("This attribute already exists")
         return value
 
-
 class ProductAttributeUpdateSerializer(serializers.ModelSerializer):
-    """Updates attribute name. Admin only."""
+    """Updates attribute name only"""
 
     class Meta:
-        model  = ProductAttribute
+        model = ProductAttribute
         fields = ['name']
-
+    
     def update(self, instance, validated_data):
         instance.name = validated_data.get('name', instance.name)
         instance.save()
         return instance
 
-
 class ProductAttributeDeleteSerializer(serializers.Serializer):
-    """Deletes an attribute and all its values."""
-
+    """
+    Deletes an attribute and all its values
+    """
     def save(self):
         self.context['attribute'].delete()
 
 
 class ProductAttributeListSerializer(serializers.ModelSerializer):
-    """All attributes — used in filter sidebar."""
+    """All attribute - used in filter sidebar"""
     value_count = serializers.SerializerMethodField()
 
     class Meta:
-        model  = ProductAttribute
+        model = ProductAttribute
         fields = ['id', 'name', 'slug', 'value_count']
         read_only_fields = fields
-
+    
     def get_value_count(self, obj):
         return obj.values.count()
-
-
+    
 class ProductAttributeValueCreateSerializer(serializers.ModelSerializer):
-    """Adds a new value to an attribute."""
+    """Adds a new value to an attribute"""
 
     class Meta:
-        model  = ProductAttributeValue
+        model = ProductAttribute
         fields = ['value', 'color_code']
         extra_kwargs = {'value': {'required': True}}
 
@@ -904,18 +878,16 @@ class ProductAttributeValueCreateSerializer(serializers.ModelSerializer):
         if ProductAttributeValue.objects.filter(attribute=attribute, value__iexact=value).exists():
             raise serializers.ValidationError("This value already exists for this attribute.")
         return value
-
-    def create(self, validated_data):
+    
+    def create(self, validated_date):
         return ProductAttributeValue.objects.create(
-            attribute=self.context['attribute'], **validated_data
+            attribute=self.context['attribute'], **validated_date
         )
 
-
 class ProductAttributeValueListSerializer(serializers.ModelSerializer):
-    """All values for a given attribute."""
-
+    """All value for a given attribute"""
     class Meta:
-        model  = ProductAttributeValue
+        model = ProductAttribute
         fields = ['id', 'value', 'color_code']
         read_only_fields = fields
 
@@ -923,46 +895,43 @@ class ProductAttributeValueListSerializer(serializers.ModelSerializer):
 # ═════════════════════════════════════════════════════════════════════════════
 # PRODUCT REVIEWS
 # ═════════════════════════════════════════════════════════════════════════════
-
 class ProductReviewSerializer(serializers.ModelSerializer):
     """Full review details."""
-    reviewer_name   = serializers.SerializerMethodField()
+    reviewer_name = serializers.SerializerMethodField()
     reviewer_avatar = serializers.SerializerMethodField()
 
     class Meta:
-        model  = ProductReview
+        model = ProductReview
         fields = [
-            'id', 'reviewer_name', 'reviewer_avatar',
-            'rating', 'title', 'comment',
-            'is_verified_purchase', 'is_approved',
-            'helpful_count', 'created_at', 'updated_at',
+            'id', 'reviewer_name', 'reviewer_avatar', 'rating', 'title',
+            'comment', 'is_verified_purchase', 'is_approved', 'helpful_count',
+            'created_at', 'created_at', 'updated_at',
         ]
         read_only_fields = fields
-
+    
     def get_reviewer_name(self, obj):
         return obj.user.get_full_name() or obj.user.username
-
+    
     def get_reviewer_avatar(self, obj):
         return obj.user.get_avatar_url()
 
-
 class ProductReviewCreateSerializer(serializers.ModelSerializer):
     """
-    Creates a review — requires a verified purchase (order_item).
+    Creates a review - requires a verified purchase (order_item)
     POST /products/<id>/reviews/
     """
 
     class Meta:
-        model  = ProductReview
+        model = ProductReview
         fields = ['order_item', 'rating', 'title', 'comment']
         extra_kwargs = {
             'order_item': {'required': True},
             'rating':     {'required': True},
         }
-
+    
     def validate(self, attrs):
-        user       = self.context['request'].user
-        product    = self.context['product']
+        user = self.context['request'].user
+        product = self.context['product']
         order_item = attrs['order_item']
 
         if order_item.product_id != product.pk:
@@ -971,61 +940,56 @@ class ProductReviewCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"order_item": "You can only review your own purchases."})
         if ProductReview.objects.filter(order_item=order_item).exists():
             raise serializers.ValidationError("You have already reviewed this purchase.")
-
+        
         return attrs
-
+    
     def create(self, validated_data):
         return ProductReview.objects.create(
             product=self.context['product'],
             user=self.context['request'].user,
-            **validated_data,
+            **validated_data
         )
 
-
 class ProductReviewUpdateSerializer(serializers.ModelSerializer):
-    """Edits own review."""
+    """Edits own review"""
 
     class Meta:
-        model  = ProductReview
+        model = ProductReview
         fields = ['rating', 'title', 'comment']
         extra_kwargs = {f: {'required': False} for f in fields}
-
+    
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        instance.save()
         return instance
 
-
-class ProductReviewDeleteSerializer(serializers.Serializer):
-    """Validates ownership before deletion."""
+class ProductReviewDeleteSerializer(serializers.Serializer): 
+    """Validates ownership before deletion"""
 
     def validate(self, attrs):
         review = self.context['review']
-        user   = self.context['request'].user
+        user = self.context['request'].user
         if review.user_id != user.pk and not user.is_staff:
-            raise serializers.ValidationError("You can only delete your own reviews.")
+            raise serializers.ValidationError("You can only delete your own reviews")
         return attrs
-
+    
     def save(self):
         self.context['review'].delete()
-
 
 class ProductReviewListSerializer(serializers.ModelSerializer):
     """Lightweight review list item."""
     reviewer_name = serializers.SerializerMethodField()
 
     class Meta:
-        model  = ProductReview
+        model = ProductReview
         fields = ['id', 'reviewer_name', 'rating', 'title', 'comment', 'is_verified_purchase', 'created_at']
         read_only_fields = fields
-
+    
     def get_reviewer_name(self, obj):
         return obj.user.get_full_name() or obj.user.username
 
-
 class ProductReviewStatsSerializer(serializers.Serializer):
-    """Rating breakdown — 1 to 5 star distribution."""
+    """Rating breakdown - 1 to 5 star distributribution"""
 
     def to_representation(self, instance: Product):
         approved  = instance.reviews.filter(is_approved=True)
@@ -1034,15 +998,14 @@ class ProductReviewStatsSerializer(serializers.Serializer):
         for row in approved.values('rating').annotate(count=Count('id')):
             breakdown[str(int(row['rating']))] = row['count']
         return {
-            'total_reviews':    approved.count(),
-            'average_rating':   round(float(avg), 2),
+            'total_reviews': approved.count(),
+            'average_rating': round(float(avg), 2),
             'rating_breakdown': breakdown,
         }
 
-
 class ProductReviewHelpfulSerializer(serializers.Serializer):
     """
-    Increments helpful_count on a review.
+    Increments helpful_count on a review
     POST /products/reviews/<id>/helpful/
     """
 
@@ -1053,29 +1016,40 @@ class ProductReviewHelpfulSerializer(serializers.Serializer):
 
 
 class ProductReviewVerifiedSerializer(serializers.ModelSerializer):
-    """Verified purchase reviews only."""
+    """Verified purchase reviews only"""
     reviewer_name = serializers.SerializerMethodField()
 
     class Meta:
-        model  = ProductReview
+        model = ProductReview
         fields = ['id', 'reviewer_name', 'rating', 'title', 'comment', 'helpful_count', 'created_at']
         read_only_fields = fields
-
+    
     def get_reviewer_name(self, obj):
         return obj.user.get_full_name() or obj.user.username
 
-
 class ProductReviewWithImagesSerializer(serializers.ModelSerializer):
-    """Reviews that have attached customer photos (placeholder — add ReviewImage model when ready)."""
+    """Reviews that have attached customer photo (placeholder - add ReviewImage model when ready)."""
     reviewer_name = serializers.SerializerMethodField()
 
     class Meta:
-        model  = ProductReview
+        model = ProductReview
         fields = ['id', 'reviewer_name', 'rating', 'title', 'comment', 'created_at']
         read_only_fields = fields
-
+    
     def get_reviewer_name(self, obj):
         return obj.user.get_full_name() or obj.user.username
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ═════════════════════════════════════════════════════════════════════════════
