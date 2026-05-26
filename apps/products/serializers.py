@@ -1238,13 +1238,492 @@ class WishlistItemBulkDeleteSerializer(serializers.Serializer):
         wishlist = self.context['wishlist']
         wishlist.items.filter(pk__in=self.validated_data['item_ids']).delete()
 
+# ═════════════════════════════════════════════════════════════════════════════
+# PRODUCT DISCOVERY
+# ═════════════════════════════════════════════════════════════════════════════
+class FeaturedProductsSerializer(serializers.ModelSerializer):
+    primary_image = serializers.SerializerMethodField()
+    discount_percentage = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'compare_at_price', 'discount_percentage', 'rating_average', 'primary_image']
+        read_only_fields= fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+
+class TrendingProductsSerializer(serializers.ModelSerializer):
+    primary_image = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'view_count', 'sold_count', 'rating_average', 'primary_image']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+
+class NewArrivalsSerializer(serializers.ModelSerializer):
+    primary_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'rating_average', 'primary_image', 'created_at']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+
+class BestSellersSerializer(serializers.ModelSerializer):
+    prrimary_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'sold_count', 'rating_average', 'primary_image']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+    
+class SimilarProductsSerializer(serializers.ModelSerializer):
+    """Same category, same market - exclude the current product"""
+
+    primary_image = serializers.SerializerMethodField()
+    discount_percentage = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'discount_percentage', 'rating_average', 'primary_image']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
 
 
+class FrequentlyBoughtTogetherSerializer(serializers.ModelSerializer):
+    """Products often ordered together - placeholder until analytics data exists"""
+
+    primar_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'rating_average', 'primary_image']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
 
 
+class YouMayAlsoLikeSerializer(serializers.ModelSerializer):
+    """Personalized recomendations - same category, high rating."""
+    primary_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'rating_average', 'primary_image']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+
+class RecommendedProductsSerializer(serializers.ModelSerializer):
+    """Recommendations based on user browse history - same as YouMayAlsoLike shape"""
+    primary_image = serializers.SerializerMethodField()
+    discount_percentage = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'discount_percentage', 'rating_average', 'primary_image']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+# PRODUCT BROWSING
+# ═════════════════════════════════════════════════════════════════════════════
+
+class CategoryBrowsSerializer(serializers.ModelSerializer):
+    """Category page - subcategories + product count"""
+    children = serializers.SerializerMethodField()
+    product_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'slug', 'description', 'icon', 'product_count', 'children']
+        read_only_fields = fields
+    
+    def get_children(self, obj):
+        return CategoryListSerializer(obj.Children.filter(is_active=True), many=True).data
+    
+    def get_product_count(self, obj):
+        return obj.products.filter(is_active=True).count()
 
 
+class CategoryProductListSerializer(serializers.ModelSerializer):
+    """Products in a category - same as ProductListSerializer, filter appliaed in view"""
+    primary_image = serializers.SerializerMethodField()
+    discount_percentage = serializers.ReadOnlyField()
+    in_stock = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'compare_at_price', 'discount_percentage', 'in_stock', 'rating_average', 'primary_image']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
 
 
+class SubcategoryListSerializer(serializers.ModelSerializer):
+    """Subcategories of a given category"""
+    product_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'slug', 'icon', 'product_count']
+        read_only_fields = fields
+
+    def get_product_count(self, obj):
+        return obj.products.filter(is_active=True).count()
+
+class CategoryBreadcrumbSerializer(serializers.Serializer):
+    """
+    Navigation breadcrumb trail for a product/category page
+    Walks parent_id chain upward.
+    """
+
+    def to_representation(self, instance: Category):
+        breadcrumb = []
+        current = instance
+        while current:
+            breadcrumb.insert(0, {'id': current.pk, 'name': current.name, 'slug': current.slug})
+            current = current.parent_id
+        return {'breadcrumb': breadcrumb}
+
+
+class PopularCategoriesSerializer(serializers.ModelSerializer):
+    """Most popular categories by product count."""
+    product_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'slug', 'icon', 'product_count']
+        read_only_fields = fields
+    
+    def get_product_count(self, obj):
+        return obj.products.filter(is_active=True).count()
+
+class CategoryWithTopProductsSerializer(serializers.ModelSerializer):
+    """Category with its top 4 rated products."""
+    top_products = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'slug', 'icon', 'top_products']
+        read_only_fields = fields
+    
+    def get_top_products(self, obj):
+        qs = obj.products.filter(is_active=True).order_by('-rating_average')[:4]
+        return ProductCardSerializer(qs, many=True).data
+
+
+class ProductListPageSerializer(serializers.Serializer):
+    """
+    Aggregated data for a complete product listing page:
+    products + available filters + price range.
+    Assempled in the view
+    """
+
+    products = ProductListSerializer(many=True)
+    total_count = serializers.IntegerField()
+    price_min = serializers.DecimalField(max_digits=10, decimal_places=2)
+    price_max = serializers.DecimalField(max_digits=10, decimal_places=2)
+    categories = CategoryProductCountSerializer(many=True)
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PRODUCT FILTERING
+# ═════════════════════════════════════════════════════════════════════════════
+class ProductFilterSerializer(serializers.Serializer):
+    """Input serializer - validates the filter params from query string."""
+    q               = serializers.CharField(required=False, allow_blank=True)
+    category        = serializers.IntegerField(required=False)
+    min_prict       = serializers.DecimalField(required=False, max_digits=10, decimal_places=2)
+    max_prict       = serializers.DecimalField(required=False, max_digits=10, decimal_places=2)
+    min_rating      = serializers.DecimalField(required=False, max_digits=3, decimal_places=2)
+    in_stock        = serializers.BooleanField(required=False)
+    is_featured     = serializers.BooleanField(required=False)
+    market          = serializers.IntegerField(required=False)
+    sort            = serializers.ChoiceField(
+        required=False,
+        choices=['price_asc', 'price_desc', 'rating', 'newest', 'popular', 'sales'],
+    )
+
+class PriceRangeFilterSerializer(serializers.Serializer):
+    """Filter by price range."""
+    min_prict = serializers.DecimalField(required=True, max_digits=10, decimal_places=2)
+    max_prict = serializers.DecimalField(required=True, max_digits=10, decimal_places=2)
+
+    def validate(self, attrs):
+        if attrs['min_price'] > attrs['max_price']:
+            raise serializers.ValidationError("min_price cannot be greater than max_price")
+        return attrs
+
+class RatingFilterSerializer(serializers.Serializer):
+    """Filter by minimum rating"""
+    min_rating = serializers.DecimalField(required=True, max_digits=3, decimal_places=2, min_value=Decimal('1'), max_value=Decimal('5'))
+
+class BrandFilterSerializer(serializers.Serializer):
+    """Filter by market/brand IDs"""
+    market_ids = serializers.ListField(child=serializers.IntegerField(), min_length=1)
+
+class AvailabilityFilterSerializer(serializers.Serializer):
+    """Filter in-stock / out-of-stock."""
+    in_stock = serializers.BooleanField(required=True)
+
+class AttributeFilterSerializer(serializers.Serializer):
+    """Filter by attribute value IDs. (e.g. color=Red, size=Large)."""
+    attribute_value_ids = serializers.ListField(child=serializers.IntegerField(), min_length=1)
+
+class SortOptionsSerializer(serializers.Serializer):
+    """Available sorting options returnd to the frontend."""
+
+    def to_representation(self, instance):
+        return {
+            'options': [
+                {'value': 'newest',     'label': 'Newest First'},
+                {'value': 'price_asc',  'label': 'Price: Low to High'},
+                {'value': 'price_desc', 'label': 'Price: High to Low'},
+                {'value': 'rating',     'label': 'Highest Rated'},
+                {'value': 'popular',    'label': 'Most Viewed'},
+                {'value': 'sales',      'label': 'Best Selling'},
+            ]
+        }
+
+class AvailableFiltersSerializer(serializers.Serializer):
+    """All available filters for a result set - assembled in the view."""
+
+    def to_representation(self, instance):
+        qs = instance
+        price_data = qs.aggregate(min=Min('price'), max=Max('price'))
+        categories = Category.objects.filter(
+            products__in=qs
+        ).annotate(count=Count('products')).order_by('-count')[:10]
+
+        return {
+            'price_range': {
+                'min': str(price_data['min'] or 0),
+                'max': str(price_data['max'] or 0)
+            },
+            'categories': CategoryProductCountSerializer(categories, many=True).data,
+            'in_stock_count': qs.filter(stock_quantity__gt=0).count(),
+        }
+    
+class ActiveFiltersSerializer(serializers.Serializer):
+    """Currently applied filters - for the active - filter chips UI"""
+    filters = serializers.DictField(child=serializers.CharField())
+
+class FilterCountSerializer(serializers.Serializer):
+    """Product count per filter option"""
+    filter_type = serializers.CharField()
+    filter_value = serializers.CharField()
+    count = serializers.IntegerField()
+
+class PriceRangeSerializer(serializers.Serializer):
+    """Min/max price for the current result set."""
+
+    def to_representation(self, qs):
+        data = qs.aggregate(min=Min('price'), max=Max('price'))
+        return {
+            'min': str(data['min'] or 0),
+            'max': str(data['max'] or 0),
+        }
+
+class ProductGridSerializer(serializers.ModelSerializer):
+    """Products formatted for grif view - same as ProductCardSerializer"""
+    primary_image = serializers.SerializerMethodField()
+    discount_percentage = serializers.ReadOnlyField()
+    in_stock = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Product 
+        fields = ['id', 'name', 'slug', 'price', 'compare_at_price', 'discount_percentage', 'in_stock', 'rating_average', 'primary_image']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+    
+# ═════════════════════════════════════════════════════════════════════════════
+# PERSONALIZATION
+# ═════════════════════════════════════════════════════════════════════════════
+
+class PersonalizedFeedSerializer(serializers.ModelSerializer):
+    """Personalized product feed - top rated from categories user has browsed"""
+
+    primary_image = serializers.SerializerMethodField()
+    discount_percentage = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'discount_percentage', 'rating_average', 'primary_image']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+
+
+class RecentlyViewedSerializer(serializers.ModelSerializer):
+    """
+    User's recently viewed products.
+    Requires a RecentlyViewed model / Redis cashe - placeholder shape.
+    """
+
+    primary_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'rating_average', 'primary_image']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+    
+class ViewHistorySerializer(serializers.ModelSerializer):
+    """Complete browsing history shape (plug into RecentlyViewed model)."""
+
+    primary_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'primary_image']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+
+class ForYouSerializer(serializers.ModelSerializer):
+    """"For you" feed - high-rated products from user's top categories."""
+    primary_image = serializers.SerializerMethodField()
+    discount_percentage = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'discount_percentage', 'rating_average', 'primary_image']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+
+class BasedOnYourInterestsSerializer(serializers.ModelSerializer):
+    """Products matching user's wishlist categories."""
+    primary_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'rating_average', 'primary_image']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+
+
+class BecauseYouViewedSerializer(serializers.ModelSerializer):
+    """Because you viewed X - same category as a reference product."""
+    primary_image = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'slug', 'price', 'rating_average', 'primary_image']
+        read_only_fields = fields
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PRODUCT COMPARISON
+# ═════════════════════════════════════════════════════════════════════════════
+class ProductCompareSerializer(serializers.ModelSerializer):
+    """Full product data shaped for side-by-side comparison"""
+    primary_image = serializers.SerializerMethodField()
+    discount_percentage = serializers.ReadOnlyField()
+    in_stock = serializers.ReadOnlyField()
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    attributes = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'name', 'slug', 'category_name',
+            'price', 'compare_at_price', 'discount_percentage',
+            'stock_quantity', 'in_stock',
+            'weight', 'dimensions',
+            'rating_average', 'review_count', 'sold_count',
+            'is_digital', 'primary_image', 'attributes',
+        ]
+        read_only_fields = fields 
+    
+    def get_primary_image(self, obj):
+        return _primary_image(obj)
+    
+
+    def get_attribute(self, obj):
+        """Flatten variant attribute into a unified dict for comparison"""
+        attrs = {}
+        for variant in obj.product_variants.filter(is_active=True):
+            if variant.attributes:
+                attrs.update(variant.attributes)
+        return attrs
+        
+class ProductCompareAddSerializer(serializers.Serializer):
+    """
+    Adds a product to the comparison list (client-side session / localStorage).
+    POST /products/compare/add/
+    Max 4 products in comparison at once.
+    """
+
+    product_id = serializers.IntegerField()
+    current_compare = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        default=list,
+    )
+
+    def validate(self, attrs):
+        try:
+            self._product = Product.objects.get(pk=attrs['product_id'], is_active=True)
+        except Product.DoesNotExist:
+            raise serializers.ValidationError({"product_id": "Product not found"})
+        
+        current = attrs.get('current_compare', [])
+        if len(current) >= 4:
+            raise serializers.ValidationError("You can compare at most 4 products at a time.")
+        if attrs['product_id'] in current:
+            raise serializers.ValidationError("This product is already in your comparison list.")
+        return attrs
+    
+    def save(self):
+        return self._product
+
+
+class ProductCompareListSerializer(serializers.Serializer):
+    """
+    Returns full comparison data for a list of product IDs.
+    POST /products/compare/
+    """
+    product_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        min_length=2,
+        max_length=4,
+    )
+
+    def validate_product_ids(self, value):
+        products = Product.objects.filter(pk__in=value, is_active=True)
+        if products.count() != len(value):
+            raise serializers.ValidationError("One or more products were not found")
+        self._products = products
+        return value
+    
+    def save(self):
+        return ProductCompareSerializer(self._products, many=True).data

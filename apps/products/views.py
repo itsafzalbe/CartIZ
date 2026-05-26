@@ -173,7 +173,7 @@ class SubcategoryListView(APIView):
         return ok("Subcategories retrieved.", data={"subcategories": SubcategoryListSerializer(subs, many=True).data})
 
 
-class CategoryProductListSerializer(APIView):
+class CategoryProductListView(APIView):
     """GET /products/categories/<id>/products/ - products in a category with filters"""
 
     permission_classes = [AllowAny]
@@ -664,7 +664,7 @@ class ProductReviewWithImagesView(APIView):
 # ═════════════════════════════════════════════════════════════════════════════
 # WISHLISTS
 # ═════════════════════════════════════════════════════════════════════════════
-class WishlistCreateView(APIView):
+class WishlistListCreateView(APIView):
     """
     GET     /products/wishlists/
     POST    /products/wishlists/
@@ -755,7 +755,7 @@ class WishlistItemBulkDeleteView(APIView):
     """DELETE /products/wishlists/<pk>/items/bulk/"""
 
     permission_classes = [IsAuthenticated]
-
+    
     def delete(self, request, pk):
         wishlist = get_object_or_404(Wishlist, pk=pk, user=request.user)
         s = WishlistItemBulkDeleteSerializer(data=request.data, context={"wishlist": wishlist})
@@ -763,14 +763,245 @@ class WishlistItemBulkDeleteView(APIView):
         s.save()
         return ok("Items removed from wishlist")
 
+# ═════════════════════════════════════════════════════════════════════════════
+# DISCOVERY
+# ═════════════════════════════════════════════════════════════════════════════
+class FeaturedProductsView(APIView):
+    """GET /products/featured/"""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        qs = Product.objects.filter(is_active=True, is_featured=True).order_by('-rating_average')[:20]
+        return ok("Featured products retrieved.", data={"products": FeaturedProductsSerializer(qs, many=True).data})
+
+class TrendingProductsView(APIView):
+    """GET /products/trending/"""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        qs = Product.objects.filter(is_active=True).order_by('-view_count')[:20]
+        return ok("Trending products retrieved.", data={"products": TrendingProductsSerializer(qs, many=True).data})
+    
+
+class NewArrivalsView(APIView):
+    """GET /products/new-arrivals/"""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        qs = Product.objects.filter(is_active=True).order_by('-created_at')[:20]
+        return ok("New arrivals retrieved.", data={"products": NewArrivalsSerializer(qs, many=True).data})
+
+class BestSellersView(APIView):
+    """GET /products/best-sellers/"""
+
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        qs = Product.objects.filter(is_active=True).order_by('-sold_count')[:20]
+        return ok("Best sellers retrieved.", data={"products": BestSellersSerializer(qs, many=True).data})
+
+class TopRatedProductsView(APIView):
+    """GET /products/top-rated/"""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        qs = Product.objects.filter(is_active=True, review_count__gte=5).order_by('-rating_average')[:20]
+        return ok("Top rated products retrieved.", data={"products": ProductTopRatedSerializer(qs, many=True).data})
+
+class SimilarProductsView(APIView):
+    """GET  /products/<slug>/similar/"""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        product = get_object_or_404(Product, slug=slug, is_active=True)
+        similar = Product.objects.filter(
+            category=product.category, is_active=True
+        ).exclude(pk=product.pk).order_by('-rating_average')[:8]
+        return ok("Similar products retrieved.", data={"products": SimilarProductsSerializer(similar, many=True).data})
+
+class FrequentlyBoughtTogetherView(APIView):
+    """GET  /products/<slug>/frequently-bought/"""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        product = get_object_or_404(Product, slug=slug, is_active=True)
+        #Placeholder: same market, different product, high sales
+        qs = Product.objects.filter(
+            market=product.market, is_active=True
+        ).exclude(pk=request.pk).order_by('-sold_count')[:6]
+        return ok("Frequently bought together retrieved.", data={"products": FrequentlyBoughtTogetherSerializer(qs, many=True).data})
+
+class YouMayAlsoLikeView(APIView):
+    """GET  /products/<slug>/you-may-also-like/"""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        product = get_object_or_404(Product, slug=slug, is_active=True)
+        qs = Product.objects.filter(
+            category=product.category, is_active=True
+        ).exclude(pk=product.pk).order_by('-rating_average', '-sold_count')[:8]
+        return ok("You may also like retrieved.", data={"products": YouMayAlsoLikeSerializer(qs, many=True).data})
+
+class RecommendedProductsView(APIView):
+    """GET /products/recommended/ - based on user's wishlist categories."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        cat_ids = WishlistItem.objects.filter(
+            wishlist__user=request.user
+        ).values_list('product__category_id', flat=True).distinct()
+
+        qs = Product.objects.filter(
+            is_active = True, category_id__in=cat_ids
+        ).order_by('-rating_average')[:20]
+        return ok("Recommended products retrieved.", data={"products": RecommendedProductsSerializer(qs, many=True).data})
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# BROWSING & FILTERING
+# ═════════════════════════════════════════════════════════════════════════════
+class ProductSearchView(APIView):
+    """GET /products/search/?q=... -full text search."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        q = request.query_params.get('q', '').strip()
+        if not q:
+            return Response({"status": "error", "message": "Search query is required."}, status=400)
+        
+        qs = Product.objects.filter(
+            is_active=True
+        ).filter(
+            Q(name__icontains=q) | Q(description__icontains=q) | Q(sku__icontains=q)
+        ).order_by('-rating_average')
+
+        return ok(f"Search results for '{q}'.", data={"count": qs.count(), "result": ProductSearchSerializer(qs, many=True).data})
+
+class ProductGridView(APIView):
+    """GET /products/grid/ - products formatted for grid with all filters."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        qs = Product.objects.filter(is_active=True)
+        filter_s = ProductFilterSerializer(data=request.query_params)
+        if filter_s.is_valid():
+            qs = _apply_filters(qs, filter_s.validated_data)
+        return ok("Grid data retrieved.", data={"count": qs.count(), "products": ProductGridSerializer(qs, many=True).data})
+
+class AvailableFiltersView(APIView):
+    """GET /products/filters/available/ - filters for current result set."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        qs = Product.objects.filter(is_active=True)
+        filter_s = ProductFilterSerializer(data=request.query_params)
+        if filter_s.is_valid():
+            qs = _apply_filters(qs, filter_s.validated_data)
+        return ok("Available filtes retrieve.", data=AvailableFiltersSerializer(qs).data)
+
+class SortOptionsView(APIView):
+    """GET /products/sort-options/"""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return ok("Sort options retrieved.", data=SortOptionsSerializer({}).data)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PERSONALISATION
+# ═════════════════════════════════════════════════════════════════════════════
+class PersonalizedFeedView(APIView):
+    """GET /products/feed/"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        cat_ids = WishlistItem.objects.filter(
+            wishlist__user=request.user
+        ).values_list('product__category_id', flat=True).distinct()
+
+        qs = Product.objects.filter(
+            is_active=True, category_id__in=cat_ids
+        ).order_by('-rating_average')[:30] if cat_ids else \
+            Product.objects.filter(is_active=True).order_by('-sold_count')[:30]
+        
+        return ok("Personalized feed retrieved.", data={"products": PersonalizedFeedSerializer(qs, many=True).data})
+
+class RecentlyViewedView(APIView):
+    """
+    GET /products/recently-viewed/
+    Placeholder - wire to a RecentlyViewed model or Redis Cache
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        #TODO: replace with actual recently viewed tracking
+        return ok("Recently viewed retrieved.", data={"products": []})
+
+class ForYouView(APIView):
+    """GET /products/for-you/ - same as personalised feed, different label."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        cat_ids = WishlistItem.objects.filter(
+            wishlist__user=request.user
+        ).values_list('product__category_id', flat=True).distinct()
+
+        qs = Product.objects.filter(
+            is_active=True, category_id__in=cat_ids
+        ).order_by('-rating_average')[:20]
+        return ok("For You feed retrieved.", data={"products": ForYouSerializer(qs, many=True).data})
 
 
 
+class BasedOnYourInterestsView(APIView):
+    """GET /products/interests/"""
+    permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        cat_ids = Wishlist.objects.filter(
+            wishlist__user=request.user
+        ).values_list('product__category_id', flat=True).distinct()
+        qs = Product.objects.filter(is_active=True, category_id__in=cat_ids).order_by('-sold_count')[:20]
+        return ok("Based on your interests retrieved.", data={"products": BasedOnYourInterestsSerializer(qs, many=True).data})
 
+class BecauseYouViewedView(APIView):
+    """GET /products/<slug>/because-you-viewed/"""
+    permission_classes = [AllowAny]
 
+    def get(self, request, slug):
+        product = get_object_or_404(Product, slug=slug, is_active=True)
+        qs = Product.objects.filter(
+            category=product.category, is_active=True
+        ).exclude(pk=product.pk).order_by('-view_count')[:8]
+        return ok("Because you viewed retrieved.", data={"products": BecauseYouViewedSerializer(qs, many=True).data})
 
+# ═════════════════════════════════════════════════════════════════════════════
+# PRODUCT COMPARISON
+# ═════════════════════════════════════════════════════════════════════════════
+class ProductCompareView(APIView):
+    """POST /products/compare/ - returns full comparison data for a list of IDs."""
+    permission_classes = [AllowAny]
 
+    def post(self, request):
+        s = ProductCompareListSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        return ok("Comparison data retrieved.", data={"products": s.save()})
 
+class ProductCompareAddView(APIView):
+    """POST /products/compare/add/ - validates a product can be added to comparison."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        s = ProductCompareAddSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        product = s.save()
+        return ok("Product added to comparison", data=ProductCardSerializer(product).data)
 
 
