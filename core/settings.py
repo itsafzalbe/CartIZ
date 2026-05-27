@@ -27,8 +27,17 @@ SECRET_KEY = 'django-insecure-f3q#s&xip-78=@4*n89of3a1^-%ihdx6rzme$c&qe+4_=ex+a*
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "cartiz.uz",
+    "www.cartiz.uz",
+    "api.cartiz.uz",
+    "localhost",
+    "127.0.0.1",
+]
 
+
+CELERY_BROKER_URL = "redis://localhost:6379/0"
+CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
 
 # Application definition
 

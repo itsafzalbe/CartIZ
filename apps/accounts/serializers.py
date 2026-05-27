@@ -77,7 +77,7 @@ def _get_unverified_user(email: str) -> User:
 def _send_otp(user: User) -> None:
     code = user.generate_code()
     EmailVerification.objects.create(user=user, code=code)
-    send_verification_email(user.email, code)
+    send_verification_email.delay(user.email, code)
 
 
 

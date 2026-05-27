@@ -1,6 +1,7 @@
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.mail import send_mail
 from django.conf import settings
+from celery import shared_task
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
@@ -13,7 +14,7 @@ def get_tokens_for_user(user) -> dict:
     }
 
 
-
+@shared_task
 def send_verification_email(email, code):
     subject = 'Email Verification Code'
     message = f"""
@@ -28,7 +29,6 @@ If you didn't request this code, please ignore this email.
 
     from_email = settings.EMAIL_HOST_USER
     recipient_list = [email]               
-
     send_mail(
         subject = subject,
         message = message,

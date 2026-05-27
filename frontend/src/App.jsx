@@ -7,10 +7,13 @@ import VerifyEmailPage     from './pages/auth/VerifyEmailPage'
 import CompleteProfilePage from './pages/auth/CompleteProfilePage'
 import PasswordResetPage   from './pages/auth/PasswordResetPage'
 
-import DashboardPage  from './pages/account/DashboardPage'
-import ProfilePage    from './pages/account/ProfilePage'
-import AddressesPage  from './pages/account/AddressesPage'
-import SecurityPage   from './pages/account/SecurityPage'
+import DashboardPage    from './pages/account/DashboardPage'
+import ProfilePage      from './pages/account/ProfilePage'
+import AddressesPage    from './pages/account/AddressesPage'
+import SecurityPage     from './pages/account/SecurityPage'
+import BecomeSellerPage from './pages/account/BecomeSellerPage'
+import SellerPage       from './pages/account/SellerPage'
+import SellerStatsPage  from './pages/account/SellerStatsPage'
 
 export default function App() {
   return (
@@ -21,10 +24,13 @@ export default function App() {
       <Route path="/complete-profile" element={<CompleteProfilePage />} />
       <Route path="/reset-password"   element={<PasswordResetPage />} />
 
-      <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+      <Route path="/dashboard"           element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/dashboard/profile"   element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="/dashboard/addresses" element={<ProtectedRoute><AddressesPage /></ProtectedRoute>} />
       <Route path="/dashboard/security"  element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
+      <Route path="/dashboard/become-seller" element={<ProtectedRoute><BecomeSellerPage /></ProtectedRoute>} />
+      <Route path="/dashboard/seller"        element={<ProtectedRoute><SellerPage /></ProtectedRoute>} />
+      <Route path="/dashboard/seller/stats"  element={<ProtectedRoute><SellerStatsPage /></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

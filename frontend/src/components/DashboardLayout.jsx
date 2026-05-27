@@ -1,14 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { logout as logoutApi } from '../api/auth'
-import { getRefresh, clearTokens } from '../utils/token'
-
-const links = [
-  { to: '/dashboard',           icon: '▤', label: 'Overview'  },
-  { to: '/dashboard/profile',   icon: '◉', label: 'Profile'   },
-  { to: '/dashboard/addresses', icon: '⌖', label: 'Addresses' },
-  { to: '/dashboard/security',  icon: '⚿', label: 'Security'  },
-]
+import { getRefresh } from '../utils/token'
 
 export default function DashboardLayout({ children }) {
   const { user, logout } = useAuth()
@@ -20,9 +13,26 @@ export default function DashboardLayout({ children }) {
     navigate('/login', { replace: true })
   }
 
+  const baseLinks = [
+    { to: '/dashboard',           icon: '▤', label: 'Overview'   },
+    { to: '/dashboard/profile',   icon: '◉', label: 'Profile'    },
+    { to: '/dashboard/addresses', icon: '⌖', label: 'Addresses'  },
+    { to: '/dashboard/security',  icon: '⚿', label: 'Security'   },
+  ]
+
+  const sellerLinks = user?.is_seller
+    ? [
+        { to: '/dashboard/seller',       icon: '⊞', label: 'My Market'  },
+        { to: '/dashboard/seller/stats', icon: '↗', label: 'Market Stats'},
+      ]
+    : [
+        { to: '/dashboard/become-seller', icon: '＋', label: 'Become Seller' },
+      ]
+
+  const links = [...baseLinks, ...sellerLinks]
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
       <aside className="w-56 bg-white border-r border-gray-200 flex flex-col py-6 px-4 fixed h-full">
         <div className="mb-8 px-2">
           <h1 className="text-lg font-semibold text-gray-900">Cartiz</h1>
@@ -46,8 +56,11 @@ export default function DashboardLayout({ children }) {
 
         <div className="border-t border-gray-200 pt-4 mt-4">
           <div className="flex items-center gap-3 px-3 mb-3">
-            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
-              {user?.first_name?.[0]}{user?.last_name?.[0]}
+            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 overflow-hidden">
+              {user?.avatar_url
+                ? <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                : <>{user?.first_name?.[0]}{user?.last_name?.[0]}</>
+              }
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-gray-900 truncate">
@@ -63,7 +76,6 @@ export default function DashboardLayout({ children }) {
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="ml-56 flex-1 p-8">
         {children}
       </main>

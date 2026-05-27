@@ -1345,7 +1345,7 @@ class RecommendedProductsSerializer(serializers.ModelSerializer):
 # PRODUCT BROWSING
 # ═════════════════════════════════════════════════════════════════════════════
 
-class CategoryBrowsSerializer(serializers.ModelSerializer):
+class CategoryBrowseSerializer(serializers.ModelSerializer):
     """Category page - subcategories + product count"""
     children = serializers.SerializerMethodField()
     product_count = serializers.SerializerMethodField()
