@@ -1,7 +1,10 @@
 import client from './client'
 
-export const registerEmail        = (email) =>
-  client.post('/accounts/register/', { email })
+export const registerEmail        = (data) =>
+  client.post('/accounts/register/', data)
+
+export const checkEmailExists     = (email) =>
+  client.get('/accounts/email-exists/', { params: { email } })
 
 export const verifyEmail          = (email, code) =>
   client.post('/accounts/verify-email/', { email, code })

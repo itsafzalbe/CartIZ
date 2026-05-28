@@ -113,38 +113,70 @@ def _get_own_address(user: User, address_id: int) -> UserAddress:
 
 class UserRegistrationSerializer(serializers.Serializer):
     """
-    Accepts an email address and fires an OTP
+    Accepts registration details and fires an OTP
     - New email -> create inactive/unverified user, send OTP
     - Partially done -> reset status, resend OTP (lets users retry)
     - Fully registered -> reject with a clear message
     """
 
     email = serializers.EmailField()
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+    username = serializers.CharField(max_length=150)
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+    password_confirm = serializers.CharField(write_only=True)
 
     def validate_email(self, value):
         value = value.lower().strip()
-        user = User.objects.filter(email = value).first()
+        user = User.objects.filter(email=value).first()
+        self._user = user
         if user and user.is_email_verified and user.auth_status == "DONE":
             raise serializers.ValidationError("An account with this email already exists. Please login.")
         return value
 
+    def validate_username(self, value):
+        value = value.strip()
+        existing = User.objects.filter(username=value)
+        if getattr(self, "_user", None):
+            existing = existing.exclude(pk=self._user.pk)
+        if existing.exists():
+            raise serializers.ValidationError("This username is already taken.")
+        return value
+
+    def validate(self, attrs: dict) -> dict:
+        if attrs["password"] != attrs.pop("password_confirm"):
+            raise serializers.ValidationError({"password_confirm": "Passwords do not match."})
+        return attrs
+
     def save(self) -> User:
         email = self.validated_data["email"]
 
-        user, created = User.objects.get_or_create(
-            email = email, 
-            defaults={
-                "auth_status": "NEW", 
-                "is_active": False,
-                "is_email_verified": False,
-            },
-        )
-        
-        if not created:
-            user.auth_status = "NEW"
-            user.is_email_verified = False
-            user.is_active = False
-            user.save(update_fields=["auth_status", "is_email_verified", "is_active"])
+        if getattr(self, "_user", None):
+            user = self._user
+        else:
+            user = User.objects.create(
+                email=email,
+                auth_status="NEW",
+                is_active=False,
+                is_email_verified=False,
+            )
+
+        for field in ["first_name", "last_name", "username"]:
+            setattr(user, field, self.validated_data[field])
+        user.set_password(self.validated_data["password"])
+
+        user.auth_status = "NEW"
+        user.is_email_verified = False
+        user.is_active = False
+        user.save(update_fields=[
+            "first_name",
+            "last_name",
+            "username",
+            "password",
+            "auth_status",
+            "is_email_verified",
+            "is_active",
+        ])
 
         _send_otp(user)
         return user
@@ -200,7 +232,7 @@ class EmailVerificationSerializer(serializers.Serializer):
         verification.save(update_fields=["confirmed"])
 
         user.is_email_verified = True
-        user.auth_status = "REGISTERED"
+        user.auth_status = "DONE"
         user.is_active = True
         user.save(update_fields=["is_email_verified", "auth_status", "is_active"])
         return user
@@ -470,11 +502,23 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         
         uid = urlsafe_base64_encode(force_bytes(self._user.pk))
         token = default_token_generator.make_token(self._user)
-        reset_url = (
-            f"{os.environ.get("FRONTEND_URL", 'https://yourapp.com')}"
-            f"/reset-password?uid={uid}&token={token}"
+        request = self.context.get("request")
+        
+        # 1. Try to get the actual frontend domain from the Origin header
+        if request and request.META.get("HTTP_ORIGIN"):
+            base_url = request.META.get("HTTP_ORIGIN")
+        # 2. Fallback to FRONTEND_URL env var or localhost
+        else:
+            base_url = os.environ.get("FRONTEND_URL", "http://127.0.0.1:5173")
+            
+        reset_url = f"{base_url}/reset-password?uid={uid}&token={token}"
+        from .utils import send_password_reset_email
+        # Call synchronously in dev; swap to .delay() once Celery worker is running
+        send_password_reset_email(
+            email=self._user.email,
+            reset_url=reset_url,
+            first_name=self._user.first_name or "",
         )
-        # TODO: send_password_reset_email.delay(self._user.email, reset_url)
 
     
 # ─────────────────────────────────────────────────────────────────────────────

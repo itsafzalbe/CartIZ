@@ -30,6 +30,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import *
 from .serializers import *
@@ -77,6 +78,26 @@ class RegisterEmailView(APIView):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Email availability
+# ─────────────────────────────────────────────────────────────────────────────
+class EmailExistsView(APIView):
+    """
+    GET /auth/email-exists/?email=user@example.com
+
+    Returns whether the email is already registered in the database.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        email = (request.query_params.get("email") or "").lower().strip()
+        exists = False
+        if email:
+            exists = User.objects.filter(email=email).exists()
+        return ok("Email lookup complete.", data={"exists": exists})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Step 2 — Verify OTP => tested
 # ─────────────────────────────────────────────────────────────────────────────
 class VerifyEmailView(APIView):
@@ -84,8 +105,8 @@ class VerifyEmailView(APIView):
     POST /auth/verify-email/
     Body: { "email": "user@example.com", "code": "12345" }
     
-    On success advances auth_status to REGISTERED and returns the user_id
-    the client needs for the complete-profile step.
+    On success advances auth_status to DONE and returns auth tokens so the
+    client can log the user in immediately.
     """
 
     permission_classes = [AllowAny]
@@ -95,11 +116,23 @@ class VerifyEmailView(APIView):
         serializer = EmailVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        refresh = RefreshToken.for_user(user)
         return ok(
-            "Email verified. Please complete your profile.",
+            "Email verified. Welcome to CartIZ!",
             data = {
-                "user_id":     str(user.pk),
                 "auth_status": user.auth_status,
+                "refresh":     str(refresh),
+                "access":      str(refresh.access_token),
+                "user": {
+                    "id":           str(user.pk),
+                    "email":        user.email,
+                    "username":     user.username,
+                    "first_name":   user.first_name,
+                    "last_name":    user.last_name,
+                    "auth_status":  user.auth_status,
+                    "is_seller":    user.is_seller,
+                    "avatar_url":   user.get_avatar_url(),
+                },
             },
         )
 
@@ -290,7 +323,7 @@ class PasswordResetRequestView(APIView):
     throttle_classes = [OTPRateThrottle]
 
     def post(self, request):
-        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer = PasswordResetRequestSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return ok(

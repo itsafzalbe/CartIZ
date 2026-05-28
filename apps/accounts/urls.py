@@ -41,6 +41,7 @@ from .seller_views import *
 urlpatterns = [
     # ── Registration (3 steps) ──────────────────────────────────────────────
     path("register/",          RegisterEmailView.as_view(),   name="account-register"),
+  path("email-exists/",      EmailExistsView.as_view(),     name="account-email-exists"),
     path("verify-email/",      VerifyEmailView.as_view(),     name="account-verify-email"),
     path("complete-profile/<uuid:user_id>/", CompleteProfileView.as_view(), name="account-complete-profile"),
 

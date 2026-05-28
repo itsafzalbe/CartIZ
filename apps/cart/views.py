@@ -11,9 +11,17 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import *
-from .serializers import *
-from apps.utils.response_helpers import *
+from .models import Cart, CartItem
+from .serializers import (
+    CartSerializer, CartDetailSerializer, CartSummarySerializer, CartItemCountSerializer,
+    CartItemCreateSerializer, CartItemSerializer, CartItemUpdateSerializer, CartItemDeleteSerializer,
+    AddToCartSerializer, UpdateCartQuantitySerializer, ClearCartSerializer,
+    CartItemBulkUpdateSerializer, CartItemBulkDeleteSerializer,
+    MoveToWishlistSerializer, SaveForLaterSerializer, MoveToCartSerializer,
+    ApplyCouponToCartSerializer, RemoveCouponFromCartSerializer,
+    CalculateShippingForCartSerializer, CartValidationSerializer,
+)
+from apps.utils.response_helpers import ok, created, not_found
 CART_COUPON_KEY = 'cart_coupon'
 
 
@@ -170,19 +178,7 @@ class AddToCartView(APIView):
         item = s.save()
         return created("Item added to cart.", data=CartItemSerializer(item).data)
     
-class UpdateCartQuantityView(APIView):
-    """
-    PATCH /cart/add/
-    Main storefront add-to-cart with full stock validation.
-    """
 
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        s = AddToCartSerializer(data=request.data, context={"request": request})
-        s.is_valid(raise_exception=True)
-        item = s.save()
-        return created("Item added to cart.", data=CartItemSerializer(item).data)
 
 class UpdateCartQuantityView(APIView):
     """
@@ -381,7 +377,7 @@ class CalculateShippingView(APIView):
         )
         s.is_valid(raise_exception=True)
         options = s.calculate()
-        return ok("Shipping options calculated.", data=self.options)
+        return ok("Shipping options calculated.", data=options)
 
 class CartValidationView(APIView):
     """

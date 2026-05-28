@@ -2,18 +2,22 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { completeProfile } from '../../api/auth'
 import { useAuth } from '../../hooks/useAuth'
+import AuthLayout from '../../components/AuthLayout'
+import PasswordRequirements, { getPasswordRequirements } from '../../components/PasswordRequirements'
+import { extractError, extractFieldErrors } from '../../utils/errors'
 
-const Field = ({ label, field, type = 'text', placeholder, value, onChange, error }) => (
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+const Field = ({ label, id, type = 'text', placeholder, value, onChange, error }) => (
+  <div className="auth-field">
+    <label className="auth-label" htmlFor={id}>{label}</label>
     <input
+      id={id}
       type={type}
       value={value}
       onChange={onChange}
       placeholder={placeholder}
-      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+      className="auth-input"
     />
-    {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+    {error && <p className="auth-field-error">{error}</p>}
   </div>
 )
 
@@ -29,6 +33,10 @@ export default function CompleteProfilePage() {
   })
   const [errors, setErrors]   = useState({})
   const [loading, setLoading] = useState(false)
+  const { allMet: passwordReady } = getPasswordRequirements({
+    password: form.password,
+    confirmPassword: form.password_confirm,
+  })
 
   if (!user_id) {
     navigate('/register', { replace: true })
@@ -47,41 +55,59 @@ export default function CompleteProfilePage() {
       login({ access, refresh }, { email })
       navigate('/dashboard', { replace: true })
     } catch (err) {
-      setErrors(err.response?.data?.errors ?? {})
+      // Safe: user has already verified their email, show real field errors
+      const fieldErrs = extractFieldErrors(err)
+      const general   = extractError(err, null)
+      setErrors({
+        ...fieldErrs,
+        // store general (non-field) error under a special key so JSX can render it
+        ...(Object.keys(fieldErrs).length === 0 && general ? { _general: general } : {}),
+      })
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-sm bg-white rounded-2xl border border-gray-200 p-8">
-        <h1 className="text-xl font-semibold text-gray-900 mb-1">Complete your profile</h1>
-        <p className="text-sm text-gray-500 mb-6">Just a few more details to get started.</p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="First name" field="first_name" placeholder="Alex"
-              value={form.first_name} onChange={set('first_name')} error={errors.first_name?.[0]} />
-            <Field label="Last name" field="last_name" placeholder="Smith"
-              value={form.last_name} onChange={set('last_name')} error={errors.last_name?.[0]} />
-          </div>
-          <Field label="Username" field="username" placeholder="alex_smith"
-            value={form.username} onChange={set('username')} error={errors.username?.[0]} />
-          <Field label="Password" field="password" type="password" placeholder="••••••••"
-            value={form.password} onChange={set('password')} error={errors.password?.[0]} />
-          <Field label="Confirm password" field="password_confirm" type="password" placeholder="••••••••"
-            value={form.password_confirm} onChange={set('password_confirm')} error={errors.password_confirm?.[0]} />
+    <AuthLayout
+      brandHeading="Set up your profile"
+      brandSubtext="Just a few more details and you're all set to start shopping."
+    >
+      <h1 className="auth-form-title">Complete your profile</h1>
+      <p className="auth-form-subtitle">Just a few more details to get started.</p>
 
-          {errors.non_field_errors && (
-            <p className="text-sm text-red-600">{errors.non_field_errors[0]}</p>
-          )}
+      <form onSubmit={handleSubmit} className="auth-form">
+        <div className="auth-field-grid">
+          <Field label="First name" id="profile-first" placeholder="Alex"
+            value={form.first_name} onChange={set('first_name')} error={errors.first_name?.[0]} />
+          <Field label="Last name" id="profile-last" placeholder="Smith"
+            value={form.last_name} onChange={set('last_name')} error={errors.last_name?.[0]} />
+        </div>
 
-          <button type="submit" disabled={loading}
-            className="w-full bg-gray-900 text-white text-sm font-medium py-2.5 rounded-lg hover:bg-gray-700 transition disabled:opacity-50 mt-2">
-            {loading ? 'Creating account…' : 'Create account'}
-          </button>
-        </form>
-      </div>
-    </div>
+        <Field label="Username" id="profile-username" placeholder="alex_smith"
+          value={form.username} onChange={set('username')} error={errors.username?.[0]} />
+
+        <Field label="Password" id="profile-password" type="password" placeholder="••••••••"
+          value={form.password} onChange={set('password')} error={errors.password?.[0]} />
+
+        <PasswordRequirements
+          password={form.password}
+          confirmPassword={form.password_confirm}
+        />
+
+        <Field label="Confirm password" id="profile-password-confirm" type="password" placeholder="••••••••"
+          value={form.password_confirm} onChange={set('password_confirm')} error={errors.password_confirm?.[0]} />
+
+        {(errors.non_field_errors || errors._general) && (
+          <p className="auth-error">
+            {errors._general || errors.non_field_errors?.[0] || errors.non_field_errors}
+          </p>
+        )}
+
+        <button type="submit" disabled={loading || !passwordReady} className="auth-btn-primary">
+          {loading ? 'Creating account…' : 'Create account'}
+        </button>
+      </form>
+    </AuthLayout>
   )
 }
