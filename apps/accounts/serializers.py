@@ -148,7 +148,7 @@ class UserRegistrationSerializer(serializers.Serializer):
             raise serializers.ValidationError({"password_confirm": "Passwords do not match."})
         return attrs
 
-    def save(self) -> User:
+    def save(self, **kwargs) -> User:
         email = self.validated_data["email"]
 
         if getattr(self, "_user", None):
@@ -224,7 +224,7 @@ class EmailVerificationSerializer(serializers.Serializer):
         attrs["_verification"] = verification
         return attrs
     
-    def save(self):
+    def save(self, **kwargs):
         user         = self.validated_data["_user"]
         verification = self.validated_data["_verification"]
 
@@ -274,7 +274,7 @@ class ResendVerificationEmailSerializer(serializers.Serializer):
             )
         return value
     
-    def save(self) -> None:
+    def save(self, **kwargs) -> None:
         _send_otp(self._user)
 
     
@@ -420,7 +420,7 @@ class UserLogoutSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid or expired refresh token")
         return value
     
-    def save(self) -> None:
+    def save(self, **kwargs) -> None:
         self._token.blacklist()
 
 
@@ -475,7 +475,7 @@ class PasswordChangeSerializer(serializers.Serializer):
             )
         return attrs
     
-    def save(self) -> User:
+    def save(self, **kwargs) -> User:
         user = self.context["request"].user
         user.set_password(self.validated_data["new_password"])
         user.save()
@@ -496,7 +496,7 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         self._user = User.objects.filter(email=value.lower().strip(), is_email_verified=True,).first()
         return value
     
-    def save(self) -> None:
+    def save(self, **kwargs) -> None:
         if not self._user:
             return # silen no-op
         
@@ -551,7 +551,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         attrs["_user"] = user
         return attrs
     
-    def save(self) -> User:
+    def save(self, **kwargs) -> User:
         user = self.validated_data["_user"]
         user.set_password(self.validated_data["new_password"])
         user.save()
@@ -898,7 +898,7 @@ class UserDeleteSerializer(serializers.Serializer):
             raise serializers.ValidationError("Password is incorrect.")
         return value
     
-    def save(self) -> None:
+    def save(self, **kwargs) -> None:
         user = self.context['request'].user
         if self.validated_data['hard_delete']:
             user.delete()
@@ -1109,7 +1109,7 @@ class UserAddressDeleteSerializer(serializers.Serializer):
         self._address = address
         return value
     
-    def save(self) -> None:
+    def save(self, **kwargs) -> None:
         self._address.delete()
         
             
@@ -1130,7 +1130,7 @@ class SetDefaultAddressSerializer(serializers.Serializer):
         return value
     
     @transaction.atomic
-    def save(self) -> UserAddress:
+    def save(self, **kwargs) -> UserAddress:
         user = self.context['request'].user
         UserAddress.objects.filter(user=user, is_default=True).update(is_default=False)
         self._address.is_default = True

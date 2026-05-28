@@ -4,6 +4,7 @@ from apps.orders.models import Order
 from apps.accounts.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
+from apps.products.models import Product
 
 # Create your models here.
 
@@ -91,3 +92,124 @@ class CouponUsage(models.Model):
 
 
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FLASH SALE
+# ─────────────────────────────────────────────────────────────────────────────
+ 
+class FlashSale(models.Model):
+    market          = models.ForeignKey(Market, on_delete=models.CASCADE, related_name='flash_sales')
+    title           = models.CharField(max_length=255)
+    description     = models.TextField(null=True, blank=True)
+    discount_percent = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        validators=[MinValueValidator(1)],
+        help_text='Percentage discount applied to all sale products',
+    )
+    products = models.ManyToManyField('products.Product', related_name='flash_sales', blank=True)
+    starts_at       = models.DateTimeField()
+    ends_at         = models.DateTimeField()
+    is_active       = models.BooleanField(default=True)
+    created_at      = models.DateTimeField(auto_now_add=True)
+    updated_at      = models.DateTimeField(auto_now=True)
+ 
+    class Meta:
+        db_table            = 'flash_sales'
+        verbose_name        = 'Flash Sale'
+        verbose_name_plural = 'Flash Sales'
+        ordering            = ['-starts_at']
+        indexes             = [
+            models.Index(fields=['is_active']),
+            models.Index(fields=['starts_at', 'ends_at']),
+        ]
+ 
+    def __str__(self):
+        return f"{self.title} ({self.market})"
+ 
+    def clean(self):
+        if self.ends_at and self.starts_at and self.ends_at <= self.starts_at:
+            raise ValidationError('ends_at must be after starts_at.')
+ 
+    @property
+    def is_live(self):
+        now = timezone.now()
+        return self.is_active and self.starts_at <= now <= self.ends_at
+ 
+    @property
+    def is_upcoming(self):
+        return timezone.now() < self.starts_at
+ 
+    @property
+    def is_ended(self):
+        return timezone.now() > self.ends_at
+ 
+ 
+# ─────────────────────────────────────────────────────────────────────────────
+# PROMOTION
+# ─────────────────────────────────────────────────────────────────────────────
+ 
+class Promotion(models.Model):
+    BANNER   = 'banner'
+    DISCOUNT = 'discount'
+    BUNDLE   = 'bundle'
+    SEASONAL = 'seasonal'
+    CLEARANCE = 'clearance'
+ 
+    PROMOTION_TYPE = (
+        (BANNER,    'Banner'),
+        (DISCOUNT,  'Discount'),
+        (BUNDLE,    'Bundle'),
+        (SEASONAL,  'Seasonal'),
+        (CLEARANCE, 'Clearance'),
+    )
+ 
+    market       = models.ForeignKey(Market, on_delete=models.CASCADE, related_name='promotions', null=True, blank=True)
+    title        = models.CharField(max_length=255)
+    description  = models.TextField(null=True, blank=True)
+    promo_type   = models.CharField(max_length=20, choices=PROMOTION_TYPE, default=DISCOUNT)
+    image        = models.ImageField(upload_to='promotions/', null=True, blank=True)
+    products     = models.ManyToManyField(Product, related_name='promotions', blank=True)
+    discount_percent = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        null=True, blank=True,
+        validators=[MinValueValidator(0)],
+    )
+    starts_at    = models.DateTimeField()
+    ends_at      = models.DateTimeField()
+    is_active    = models.BooleanField(default=True)
+    is_featured  = models.BooleanField(default=False)
+    view_count   = models.PositiveIntegerField(default=0)
+    click_count  = models.PositiveIntegerField(default=0)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+ 
+    class Meta:
+        db_table            = 'promotions'
+        verbose_name        = 'Promotion'
+        verbose_name_plural = 'Promotions'
+        ordering            = ['-created_at']
+        indexes             = [
+            models.Index(fields=['is_active']),
+            models.Index(fields=['promo_type']),
+            models.Index(fields=['starts_at', 'ends_at']),
+        ]
+ 
+    def __str__(self):
+        return self.title
+ 
+    def clean(self):
+        if self.ends_at and self.starts_at and self.ends_at <= self.starts_at:
+            raise ValidationError('ends_at must be after starts_at.')
+ 
+    @property
+    def is_live(self):
+        now = timezone.now()
+        return self.is_active and self.starts_at <= now <= self.ends_at
+ 
+    @property
+    def is_upcoming(self):
+        return timezone.now() < self.starts_at
+ 
+    @property
+    def is_ended(self):
+        return timezone.now() > self.ends_at

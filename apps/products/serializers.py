@@ -92,7 +92,7 @@ class CategoryDeleteSerializer(serializers.Serializer):
     DELETE /products/categories/<id>/
     """
 
-    def save(self):
+    def save(self, **kwargs):
         category        = self.context['category']
         category.is_active = False
         category.save(update_fields=['is_active'])
@@ -265,7 +265,7 @@ class ProductDeleteSerializer(serializers.Serializer):
     DELETE /products/<id>/
     """
 
-    def save(self):
+    def save(self, **kwargs):
         product             = self.context['product']
         product.is_active   = False
         product.save(update_fields=['is_active'])
@@ -646,7 +646,7 @@ class ProductImageDeleteSerializer(serializers.Serializer):
             raise serializers.ValidationError("Cannot delete the only product image")
         return attrs
     
-    def save(self):
+    def save(self, **kwargs):
         image = self.context['image']
         image.image.delete(save=False)
         image.delete()
@@ -669,7 +669,7 @@ class SetPrimaryImageSerializer(serializers.Serializer):
     PATCH /products/images/<id>/set-primary/
     """
 
-    def save(self):
+    def save(self, **kwargs):
         from django.db import transaction
         image = self.context['image']
         product = image.product
@@ -686,7 +686,7 @@ class ProductImageBulkUploadSerializer(serializers.Serializer):
     """
     images = serializers.ListField(child=serializers.ImageField(), min_length=1, max_length=10)
 
-    def save(self):
+    def save(self, **kwargs):
         from django.db import transaction
         product = self.context['product']
         created = []
@@ -769,7 +769,7 @@ class ProductVariantUpdateSerializer(serializers.ModelSerializer):
 class ProductVariantDeleteSerializer(serializers.Serializer):
     """Deactivates a variant."""
 
-    def save(self):
+    def save(self, **kwargs):
         variant = self.context['variant']
         variant.is_active = False
         variant.save(update_fields=['is_active'])
@@ -849,7 +849,7 @@ class ProductAttributeDeleteSerializer(serializers.Serializer):
     """
     Deletes an attribute and all its values
     """
-    def save(self):
+    def save(self, **kwargs):
         self.context['attribute'].delete()
 
 
@@ -973,7 +973,7 @@ class ProductReviewDeleteSerializer(serializers.Serializer):
             raise serializers.ValidationError("You can only delete your own reviews")
         return attrs
     
-    def save(self):
+    def save(self, **kwargs):
         self.context['review'].delete()
 
 class ProductReviewListSerializer(serializers.ModelSerializer):
@@ -1009,7 +1009,7 @@ class ProductReviewHelpfulSerializer(serializers.Serializer):
     POST /products/reviews/<id>/helpful/
     """
 
-    def save(self):
+    def save(self, **kwargs):
         review               = self.context['review']
         review.helpful_count += 1
         review.save(update_fields=['helpful_count'])
@@ -1091,7 +1091,7 @@ class WishlistDeleteSerializer(serializers.Serializer):
             raise serializers.ValidationError("You can only delete your own wishlists.")
         return attrs
     
-    def save(self):
+    def save(self, **kwargs):
         self.context['wishlist'].delete()
 
 class WishlistListSerializer(serializers.ModelSerializer):
@@ -1189,7 +1189,7 @@ class WishlistItemCreateSerializer(serializers.ModelSerializer):
 class WishlistItemDeleteSerializer(serializers.Serializer):
     """Removes a single item from a wishlist."""
 
-    def save(self):
+    def save(self, **kwargs):
         self.context['item'].delete()
 
 class WishlistItemListSerializer(serializers.ModelSerializer):
@@ -1234,7 +1234,7 @@ class WishlistItemBulkDeleteSerializer(serializers.Serializer):
             raise serializers.ValidationError(f"Items not found in this wishlist: {list(invalid)}")
         return value
     
-    def save(self):
+    def save(self, **kwargs):
         wishlist = self.context['wishlist']
         wishlist.items.filter(pk__in=self.validated_data['item_ids']).delete()
 
@@ -1703,7 +1703,7 @@ class ProductCompareAddSerializer(serializers.Serializer):
             raise serializers.ValidationError("This product is already in your comparison list.")
         return attrs
     
-    def save(self):
+    def save(self, **kwargs):
         return self._product
 
 
@@ -1725,5 +1725,5 @@ class ProductCompareListSerializer(serializers.Serializer):
         self._products = products
         return value
     
-    def save(self):
+    def save(self, **kwargs):
         return ProductCompareSerializer(self._products, many=True).data

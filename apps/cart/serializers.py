@@ -37,7 +37,7 @@ def _get_cart(user) -> Cart:
     return cart
 
 def _validate_item_ownership(item: CartItem, user) -> None:
-    if item.cart.user_id != user.pk:
+    if item.cart.user.id != user.pk:
         raise serializers.ValidationError("Cart item not found.")
     
 # ═════════════════════════════════════════════════════════════════════════════
@@ -85,7 +85,7 @@ class CartSerializer(serializers.ModelSerializer):
         read_only_fields = fields
     
     def get_item_count(self, obj):
-        return obj.items.count()
+        return CartItem.objects.filter(cart=obj).count()
     
 # ─────────────────────────────────────────────────────────────────────────────
 class CartItemDetailSerializer(serializers.ModelSerializer):
@@ -135,8 +135,8 @@ class CartSummarySerializer(serializers.Serializer):
     Coupon discount is injected by the view from sessions / applied coupon.
     """
 
-    def to_representation(self, cart: Cart):
-        items = cart.items.all()
+    def to_representation(self, instance: Cart):
+        items = instance.items.all()
         subtotal = sum(item.total_price for item in items)
         discount = self.context.get('discount', Decimal('0.00'))
         taxable = max(subtotal - discount, Decimal('0.00'))
@@ -158,8 +158,8 @@ class CartSummarySerializer(serializers.Serializer):
 # ─────────────────────────────────────────────────────────────────────────────
 class CartItemCountSerializer(serializers.Serializer):
     """Item count for the cart badge in the headers."""
-    def to_representation(self, cart: Cart):
-        return {'item_count': cart.items.count()}
+    def to_representation(self, instance: Cart):
+        return {'item_count': instance.items.count()}  # type: ignore
     
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -200,7 +200,7 @@ class CartItemCreateSerializer(serializers.ModelSerializer):
         fields = ['product_id', 'variant_id', 'quantity']
         extra_kwargs = {'quantity': {'default': 1}}
     
-    def validate(self, attrs):
+    def validate(self, attrs: dict):
         try:
             product = Product.objects.get(pk=attrs['product_id'], is_active=True)
         except Product.DoesNotExist:
@@ -224,7 +224,7 @@ class CartItemCreateSerializer(serializers.ModelSerializer):
         return attrs
     
     @transaction.atomic
-    def save(self):
+    def save(self, **kwargs):
         cart = _get_cart(self.context['request'].user)
         product = self.validated_data['_product']
         variant = self.validated_data['_variant']

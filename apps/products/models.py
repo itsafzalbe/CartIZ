@@ -1,4 +1,5 @@
 from django.db import models
+from decimal import Decimal
 from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
 from apps.stores.models import Market
 from django.utils.text import slugify
@@ -65,7 +66,7 @@ class Product(models.Model):
     is_featured = models.BooleanField(default=False, help_text="Featured product flag")
     is_active = models.BooleanField(default=True, help_text="Product active status")
     is_digital = models.BooleanField(default=False, help_text="Digital product flag")
-    rating_average = models.DecimalField(max_digits=3, validators=[MinValueValidator(0), MaxValueValidator(5)], decimal_places=2, default=0.00, help_text="Average rating (0-5)")
+    rating_average = models.DecimalField(max_digits=3, decimal_places=2, validators=[MinValueValidator(0), MaxValueValidator(5)], default=Decimal("0.00"), help_text="Average rating (0-5)")
     review_count = models.PositiveBigIntegerField(default=0, help_text="Total reviews")
     view_count = models.PositiveBigIntegerField(default=0, help_text="Product views")
     sold_count = models.PositiveBigIntegerField(default=0, help_text="Total units sold")
@@ -275,10 +276,10 @@ class ProductReview(models.Model):
         ]
 
     def clean(self):
-        if self.order_item.product_id != self.product_id:
+        if self.order_item.product != self.product:
             raise ValidationError("Order item does not match product.")
         
-        if self.order_item.order.user_id != self.user_id:
+        if self.order_item.order.user != self.user:
             raise ValidationError("You can only review your own purchases.")
         
         if not self.title and not self.comment:
@@ -286,7 +287,7 @@ class ProductReview(models.Model):
         
     def save(self, *args, **kwargs):
         if self.order_item:
-            self.is_verified_purchase = bool(self.order_item_id)
+            self.is_verified_purchase = True
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -363,7 +364,7 @@ class WishlistItem(models.Model):
     def clean(self):
         if not self.product.is_active:
             raise ValidationError("Cannot add inactive products to the wishlist.")
-        if self.variant and self.variant.product_id != self.product_id:
+        if self.variant and self.variant.product != self.product:
             raise ValidationError("Variant does not belong to the selected product.")
     
     def __str__(self):

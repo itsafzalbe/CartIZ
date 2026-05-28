@@ -45,9 +45,15 @@ class BecomeSellerSerializer(serializers.ModelSerializer):
         return attrs
     
     @transaction.atomic
-    def save(self) -> Market:
+    def save(self, **kwargs) -> Market:
         user = self.context['request'].user
-        market = Market.objects.create(seller=user, is_active=False, total_sales=0, **self.validated_data,)
+        validated_data = dict(self.validated_data)
+        market = Market.objects.create(
+            seller=user,
+            is_active=False,
+            total_sales=0,
+            **validated_data,
+        )
         user.is_seller = True
         user.save(update_fields=['is_seller'])
         return market
