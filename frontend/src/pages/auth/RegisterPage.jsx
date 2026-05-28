@@ -1,67 +1,223 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { registerEmail } from '../../api/auth'
+import { checkEmailExists, registerEmail } from '../../api/auth'
+import AuthLayout from '../../components/AuthLayout'
+import GoogleIcon from '../../components/GoogleIcon'
+import PasswordRequirements, { getPasswordRequirements } from '../../components/PasswordRequirements'
+import { extractError, extractFieldErrors } from '../../utils/errors'
+
+const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 export default function RegisterPage() {
   const navigate = useNavigate()
-  const [email, setEmail]   = useState('')
-  const [error, setError]   = useState('')
+  const [form, setForm]   = useState({
+    email: '',
+    first_name: '',
+    last_name: '',
+    username: '',
+    password: '',
+    password_confirm: '',
+  })
+  const [errors, setErrors]   = useState({})
   const [loading, setLoading] = useState(false)
+  const [emailExists, setEmailExists] = useState(false)
+  const [checkingEmail, setCheckingEmail] = useState(false)
+  const checkTimer = useRef(null)
+  const { allMet: passwordReady } = getPasswordRequirements({
+    password: form.password,
+    confirmPassword: form.password_confirm,
+  })
+  useEffect(() => {
+    const email = form.email.trim()
+    if (checkTimer.current) {
+      clearTimeout(checkTimer.current)
+    }
+    if (!email) {
+      setEmailExists(false)
+      setCheckingEmail(false)
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailExists(false)
+      setCheckingEmail(false)
+      return
+    }
+
+    setCheckingEmail(true)
+    checkTimer.current = setTimeout(async () => {
+      try {
+        const res = await checkEmailExists(email)
+        setEmailExists(!!res.data?.data?.exists)
+      } catch {
+        setEmailExists(false)
+      } finally {
+        setCheckingEmail(false)
+      }
+    }, 400)
+
+    return () => clearTimeout(checkTimer.current)
+  }, [form.email])
+
+  const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError('')
+    setErrors({})
     setLoading(true)
     try {
-      await registerEmail(email)
-      navigate('/verify-email', { state: { email } })
+      await registerEmail(form)
+      navigate('/verify-email', { state: { email: form.email } })
     } catch (err) {
-      const errors = err.response?.data?.errors
-      setError(
-        errors?.email?.[0] ||
-        errors?.non_field_errors?.[0] ||
-        'Something went wrong. Please try again.'
-      )
+      const fieldErrs = extractFieldErrors(err)
+      const general = extractError(err, null)
+      setErrors({
+        ...fieldErrs,
+        ...(general ? { _general: general } : {}),
+      })
     } finally {
       setLoading(false)
     }
   }
 
+  const handleGoogleSignUp = () => {
+    window.location.href = `${API_URL}/accounts/google/login/`
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-sm bg-white rounded-2xl border border-gray-200 p-8">
-        <h1 className="text-xl font-semibold text-gray-900 mb-1">Create your account</h1>
-        <p className="text-sm text-gray-500 mb-6">We'll send a verification code to your email.</p>
+    <AuthLayout
+      brandHeading="Join CartIZ today"
+      brandSubtext="Create your account and start discovering amazing products at the best prices."
+    >
+      <h1 className="auth-form-title">Create your account</h1>
+      <p className="auth-form-subtitle">We'll send a verification code to your email.</p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+      <form onSubmit={handleSubmit} className="auth-form">
+        <div className="auth-field-grid">
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="register-first">First name</label>
             <input
-              type="email"
+              id="register-first"
+              type="text"
               required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+              value={form.first_name}
+              onChange={set('first_name')}
+              placeholder="Alex"
+              className="auth-input"
             />
+            {errors.first_name && <p className="auth-field-error">{errors.first_name}</p>}
           </div>
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="register-last">Last name</label>
+            <input
+              id="register-last"
+              type="text"
+              required
+              value={form.last_name}
+              onChange={set('last_name')}
+              placeholder="Smith"
+              className="auth-input"
+            />
+            {errors.last_name && <p className="auth-field-error">{errors.last_name}</p>}
+          </div>
+        </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="register-email">Email address</label>
+          <input
+            id="register-email"
+            type="email"
+            required
+            value={form.email}
+            onChange={set('email')}
+            placeholder="you@example.com"
+            className="auth-input"
+          />
+          {errors.email && <p className="auth-field-error">{errors.email}</p>}
+          {!errors.email && emailExists && (
+            <p className="auth-field-error">This email is already registered.</p>
+          )}
+          {!errors.email && !emailExists && checkingEmail && (
+            <p className="auth-field-help">Checking email…</p>
+          )}
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-gray-900 text-white text-sm font-medium py-2.5 rounded-lg hover:bg-gray-700 transition disabled:opacity-50"
-          >
-            {loading ? 'Sending code…' : 'Continue'}
-          </button>
-        </form>
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="register-username">Username</label>
+          <input
+            id="register-username"
+            type="text"
+            required
+            value={form.username}
+            onChange={set('username')}
+            placeholder="alex_smith"
+            className="auth-input"
+          />
+          {errors.username && <p className="auth-field-error">{errors.username}</p>}
+        </div>
 
-        <p className="mt-6 text-center text-sm text-gray-500">
-          Already have an account?{' '}
-          <Link to="/login" className="text-gray-900 font-medium hover:underline">Sign in</Link>
-        </p>
-      </div>
-    </div>
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="register-password">Password</label>
+          <input
+            id="register-password"
+            type="password"
+            required
+            value={form.password}
+            onChange={set('password')}
+            placeholder="••••••••"
+            className="auth-input"
+          />
+          {errors.password && <p className="auth-field-error">{errors.password}</p>}
+        </div>
+
+        <PasswordRequirements
+          password={form.password}
+          confirmPassword={form.password_confirm}
+        />
+
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="register-password-confirm">Confirm password</label>
+          <input
+            id="register-password-confirm"
+            type="password"
+            required
+            value={form.password_confirm}
+            onChange={set('password_confirm')}
+            placeholder="••••••••"
+            className="auth-input"
+          />
+          {errors.password_confirm && (
+            <p className="auth-field-error">{errors.password_confirm}</p>
+          )}
+        </div>
+
+        {(errors.non_field_errors || errors._general) && (
+          <p className="auth-error">
+            {errors._general || errors.non_field_errors?.[0] || errors.non_field_errors}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading || !passwordReady || emailExists || checkingEmail}
+          className="auth-btn-primary"
+        >
+          {loading ? 'Sending code…' : 'Continue'}
+        </button>
+
+        <div className="auth-divider">
+          <span className="auth-divider-text">or</span>
+        </div>
+
+        <button type="button" onClick={handleGoogleSignUp} className="auth-btn-google">
+          <GoogleIcon />
+          Continue with Google
+        </button>
+      </form>
+
+      <p className="auth-footer">
+        Already have an account?{' '}
+        <Link to="/login">Sign in</Link>
+      </p>
+    </AuthLayout>
   )
 }

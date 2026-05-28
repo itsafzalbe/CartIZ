@@ -16,11 +16,9 @@ Cart Operations(4)  ApplyCouponToCartSerializer, RemoveCouponFromCartSerializer,
 
 from decimal import Decimal
 from django.db import transaction
-from django.utils import timezone
 from rest_framework import serializers
-
-from apps.products.models import *
-from .models import *
+from apps.products.models import Product, ProductVariant, Wishlist, WishlistItem
+from .models import Cart, CartItem
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared helpers
@@ -532,7 +530,7 @@ class MoveToCartSerializer(serializers.Serializer):
     """
 
     wishlist_item_id = serializers.IntegerField()
-    quantity = serializers.IntegerField(default=1, min_vlaue=1)
+    quantity = serializers.IntegerField(default=1, min_value=1)
 
     def validate(self, attrs):
         user = self.context['request'].user
@@ -584,7 +582,7 @@ class MoveToCartSerializer(serializers.Serializer):
             item.price = price
             item.save()
         
-        wl_item.delet()
+        wl_item.delete()
         return item
 
 
