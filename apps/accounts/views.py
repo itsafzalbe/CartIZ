@@ -318,6 +318,29 @@ class PasswordResetConfirmView(APIView):
 
 
 
+class EmailExistsView(APIView):
+    """
+    GET /auth/email-exists/?email=user@example.com
+ 
+    Returns { "exists": true/false } indicating whether the address belongs
+    to a fully registered account. Always 200 — the boolean does the work.
+ 
+    Intentionally uses a loose throttle; this is a read-only helper and the
+    response reveals nothing beyond what the register endpoint already tells
+    the user on submit.
+    """
+ 
+    permission_classes = [AllowAny]
+    throttle_classes   = [AnonRateThrottle]
+ 
+    def get(self, request):
+        serializer = EmailExistsSerializer(data={"email": request.query_params.get("email", "")})
+        serializer.is_valid(raise_exception=True)
+        return ok(
+            "Email check successful.",
+            data={"exists": serializer.check()},
+        )
+ 
 
 
 
@@ -341,79 +364,76 @@ class PasswordResetConfirmView(APIView):
 
 
 
-# # ─────────────────────────────────────────────────────────────────────────────
-# # Google OAuth — SPA / mobile
-# # ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Google OAuth — SPA / mobile
+# ─────────────────────────────────────────────────────────────────────────────
 
-# class GoogleOAuthView(APIView):
-#     """
-#     POST /auth/google/
-#     Body: { "id_token": "<google_id_token>" }
+class GoogleOAuthView(APIView):
+    """
+    POST /auth/google/
+    Body: { "id_token": "<google_id_token>" }
 
-#     For React Native / SPA clients that handle the Google sign-in flow
-#     themselves and send the resulting ID token to the backend.
-#     """
-#     permission_classes = [AllowAny]
+    For React Native / SPA clients that handle the Google sign-in flow
+    themselves and send the resulting ID token to the backend.
+    """
+    permission_classes = [AllowAny]
 
-#     def post(self, request):
-#         serializer = GoogleOAuthSerializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#         result = serializer.save()
+    def post(self, request):
+        serializer = GoogleOAuthSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = serializer.save()
 
-#         http_status = status.HTTP_201_CREATED if result["created"] else status.HTTP_200_OK
-#         message     = "Account created via Google." if result["created"] else "Logged in via Google."
+        http_status = status.HTTP_201_CREATED if result["created"] else status.HTTP_200_OK
+        message     = "Account created via Google." if result["created"] else "Logged in via Google."
 
-#         return success(message, data=result, http_status=http_status)
-
-
-# # ─────────────────────────────────────────────────────────────────────────────
-# # Google OAuth — server-side redirect
-# # ─────────────────────────────────────────────────────────────────────────────
-
-# class GoogleOAuthRedirectView(APIView):
-#     """
-#     GET /auth/google/redirect/
-
-#     Builds the Google consent URL and redirects the browser.
-#     Use this for traditional server-rendered or backend-driven OAuth flows.
-#     """
-#     permission_classes = [AllowAny]
-
-#     def get(self, request):
-#         params = urllib.parse.urlencode(
-#             {
-#                 "client_id":     os.environ.get("GOOGLE_CLIENT_ID", ""),
-#                 "redirect_uri":  os.environ.get(
-#                     "GOOGLE_REDIRECT_URI",
-#                     "http://localhost:8000/auth/google/callback/",
-#                 ),
-#                 "response_type": "code",
-#                 "scope":         "openid email profile",
-#                 "access_type":   "offline",
-#                 "prompt":        "select_account",
-#             }
-#         )
-#         return redirect(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
+        return ok(message, data=result, http_status=http_status)
 
 
-# class GoogleOAuthCallbackView(APIView):
-#     """
-#     POST /auth/google/callback/
-#     Body: { "code": "<auth_code>", "redirect_uri": "..." }
+# ─────────────────────────────────────────────────────────────────────────────
+# Google OAuth — server-side redirect
+# ─────────────────────────────────────────────────────────────────────────────
 
-#     The frontend/backend POSTs here after Google redirects back with a code.
-#     """
-#     permission_classes = [AllowAny]
+class GoogleOAuthRedirectView(APIView):
+    """
+    GET /auth/google/redirect/
 
-#     def post(self, request):
-#         serializer = GoogleOAuthCallbackSerializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#         result = serializer.save()
+    Builds the Google consent URL and redirects the browser.
+    Use this for traditional server-rendered or backend-driven OAuth flows.
+    """
+    permission_classes = [AllowAny]
 
-#         http_status = status.HTTP_201_CREATED if result["created"] else status.HTTP_200_OK
-#         message     = "Account created via Google." if result["created"] else "Logged in via Google."
+    def get(self, request):
+        params = urllib.parse.urlencode(
+            {
+                "client_id":     settings.GOOGLE_CLIENT_ID,
+                "redirect_uri":  settings.GOOGLE_REDIRECT_URI,
+                "response_type": "code",
+                "scope":         "openid email profile",
+                "access_type":   "offline",
+                "prompt":        "select_account",
+            }
+        )
+        return redirect(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
 
-#         return success(message, data=result, http_status=http_status)
+
+class GoogleOAuthCallbackView(APIView):
+    """
+    POST /auth/google/callback/
+    Body: { "code": "<auth_code>", "redirect_uri": "..." }
+
+    The frontend/backend POSTs here after Google redirects back with a code.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = GoogleOAuthCallbackSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = serializer.save()
+
+        http_status = status.HTTP_201_CREATED if result["created"] else status.HTTP_200_OK
+        message     = "Account created via Google." if result["created"] else "Logged in via Google."
+
+        return ok(message, data=result, http_status=http_status)
     
 
 

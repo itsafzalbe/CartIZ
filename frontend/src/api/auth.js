@@ -3,6 +3,9 @@ import client from './client'
 export const registerEmail        = (email) =>
   client.post('/accounts/register/', { email })
 
+export const checkEmailExists     = (email) =>
+  client.get('/accounts/email-exists/', { params: { email } })
+
 export const verifyEmail          = (email, code) =>
   client.post('/accounts/verify-email/', { email, code })
 
@@ -29,3 +32,9 @@ export const passwordResetConfirm = (uid, token, new_password, new_password_conf
 
 export const changePassword       = (data) =>
   client.post('/accounts/password/change/', data)
+
+export const deleteAccount        = (data) =>
+  client.delete('/accounts/me/delete/', { data })
+
+export const googleCallback = (code, redirect_uri) =>
+  client.post('/accounts/google/callback/', { code, redirect_uri })

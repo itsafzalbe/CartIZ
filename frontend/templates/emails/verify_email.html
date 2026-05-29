@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Verify Your Email — CartIZ</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f0ede0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+
+  <!-- Preheader (hidden preview text) -->
+  <span style="display:none;font-size:1px;color:#f0ede0;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+    Your CartIZ verification code is {{ code }} — expires in 3 minutes.
+  </span>
+
+  <!-- Outer wrapper -->
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0ede0;padding:48px 16px;">
+    <tr>
+      <td align="center">
+
+        <!-- Card -->
+        <table width="540" cellpadding="0" cellspacing="0" border="0" style="max-width:540px;width:100%;border-radius:20px;overflow:hidden;box-shadow:0 8px 40px rgba(0,39,43,0.12);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color:#00272b;padding:40px 48px 36px;text-align:center;">
+              <!-- Logo -->
+              <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 28px;">
+                <tr>
+                  <td style="background-color:#e0ff4f;width:44px;height:44px;border-radius:11px;text-align:center;vertical-align:middle;">
+                    <span style="font-size:22px;font-weight:800;color:#00272b;line-height:44px;display:block;">C</span>
+                  </td>
+                  <td style="padding-left:10px;vertical-align:middle;">
+                    <span style="font-size:26px;font-weight:800;color:#fffcdc;letter-spacing:-0.5px;">CartIZ</span>
+                  </td>
+                </tr>
+              </table>
+
+              <h1 style="margin:0 0 10px;font-size:28px;font-weight:700;color:#fffcdc;letter-spacing:-0.5px;line-height:1.25;">
+                Verify your email
+              </h1>
+              <p style="margin:0;font-size:15px;color:rgba(255,252,220,0.6);line-height:1.6;">
+                Use the code below to confirm your address.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="background-color:#fffcdc;padding:44px 48px;">
+
+              <p style="margin:0 0 28px;font-size:15px;color:#4a6163;line-height:1.7;">
+                Hi there,<br/><br/>
+                Someone (hopefully you!) requested an email verification code for your CartIZ account.
+                Enter this code on the verification page:
+              </p>
+
+              <!-- OTP box -->
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:28px;">
+                <tr>
+                  <td align="center">
+                    <table cellpadding="0" cellspacing="0" border="0"
+                      style="background-color:#00272b;border-radius:14px;padding:6px;">
+                      <tr>
+                        {% for digit in code %}
+                        <td style="width:52px;height:60px;text-align:center;vertical-align:middle;
+                          background-color:#e0ff4f;border-radius:9px;margin:4px;
+                          {% if not forloop.last %}border-right:6px solid #00272b;{% endif %}">
+                          <span style="font-size:30px;font-weight:800;color:#00272b;line-height:60px;display:block;
+                            font-family:'Courier New',Courier,monospace;">{{ digit }}</span>
+                        </td>
+                        {% endfor %}
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Expiry note -->
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:32px;">
+                <tr>
+                  <td style="background-color:rgba(0,39,43,0.05);border-radius:10px;padding:14px 20px;
+                    border-left:4px solid #e0ff4f;">
+                    <p style="margin:0;font-size:13px;color:#4a6163;line-height:1.5;">
+                      ⏱ This code expires in <strong style="color:#00272b;">3 minutes</strong>.
+                      If it has expired, go back and request a new one.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 8px;font-size:13px;color:#7a9396;line-height:1.6;text-align:center;">
+                If you didn't create a CartIZ account, you can safely ignore this email.
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#00272b;padding:24px 48px;text-align:center;">
+              <p style="margin:0;font-size:12px;color:rgba(255,252,220,0.4);line-height:1.6;">
+                © 2025 CartIZ · <a href="https://cartiz.uz" style="color:rgba(224,255,79,0.7);text-decoration:none;">cartiz.uz</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Card -->
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

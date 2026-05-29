@@ -4,6 +4,7 @@ import { changePassword } from '../../api/auth'
 import { deleteAccount } from '../../api/account'
 import { useAuth } from '../../hooks/useAuth'
 import DashboardLayout from '../../components/DashboardLayout'
+import PasswordRequirements, { getPasswordRequirements } from '../../components/PasswordRequirements'
 
 export default function SecurityPage() {
   const { logout } = useAuth()
@@ -18,6 +19,11 @@ export default function SecurityPage() {
   const [deleteError, setDeleteError]       = useState('')
   const [deleting, setDeleting]             = useState(false)
   const [confirmDelete, setConfirmDelete]   = useState(false)
+
+  const { allMet: passwordReady } = getPasswordRequirements({
+    password: pwForm.new_password,
+    confirmPassword: pwForm.new_password_confirm,
+  })
 
   const setPw = (f) => (e) => setPwForm(v => ({ ...v, [f]: e.target.value }))
 
@@ -67,11 +73,19 @@ export default function SecurityPage() {
                 <input type="password" value={pwForm[field]} onChange={setPw(field)}
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" />
                 {pwErrors[field] && <p className="text-xs text-red-600 mt-1">{pwErrors[field][0]}</p>}
+                {field === 'new_password' && (
+                  <div className="mt-3">
+                    <PasswordRequirements
+                      password={pwForm.new_password}
+                      confirmPassword={pwForm.new_password_confirm}
+                    />
+                  </div>
+                )}
               </div>
             ))}
             {pwErrors.non_field_errors && <p className="text-sm text-red-600">{pwErrors.non_field_errors[0]}</p>}
             <div className="flex items-center gap-3">
-              <button type="submit" disabled={pwSaving}
+              <button type="submit" disabled={pwSaving || !pwForm.old_password || !passwordReady}
                 className="bg-gray-900 text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-gray-700 transition disabled:opacity-50">
                 {pwSaving ? 'Saving…' : 'Update password'}
               </button>

@@ -64,6 +64,9 @@ urlpatterns = [
 
 
     # ── Google OAuth ─────────────────────────────────────────────────────────────
+    path('google/',           GoogleOAuthView.as_view(),          name='google-oauth'),
+    path('google/redirect/',  GoogleOAuthRedirectView.as_view(),  name='google-redirect'),
+    path('google/callback/',  GoogleOAuthCallbackView.as_view(),  name='google-callback'),
 
 
     # ── User profile ─────────────────────────────────────────────────────────────
@@ -75,6 +78,8 @@ urlpatterns = [
     path("me/avatar/update/", UserAvatarUpdateView.as_view(), name="account-me-avatar"),
     path("me/activity/",      UserActivityView.as_view(),     name="account-me-activity"),
 
+    # ── Email Exists view ───────────────────────────────────────────────────────
+    path("email-exists/", EmailExistsView.as_view(), name="email-exists"),
 
     # ── Public user profile ───────────────────────────────────────────────────
     path("users/<str:username>/", UserPublicView.as_view(),   name="account-public"),

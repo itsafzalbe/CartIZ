@@ -58,3 +58,36 @@ def verify_google_token(token: str) -> dict:
     }
 
 
+@shared_task
+def send_password_reset_email(email: str, reset_url: str) -> None:
+    html_message = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color: #00272b;">Reset your password</h2>
+        <p style="color: #4a6163;">Click the button below to reset your CartIZ password. This link expires in <strong>24 hours</strong>.</p>
+        <a href="{reset_url}"
+           style="display:inline-block; padding: 12px 28px; background: #e0ff4f;
+                  color: #00272b; font-weight: 700; text-decoration: none;
+                  border-radius: 8px; margin: 16px 0;">
+            Reset password
+        </a>
+        <p style="color: #7a9396; font-size: 13px;">
+            Or copy this link into your browser:<br>
+            <a href="{reset_url}" style="color: #00272b;">{reset_url}</a>
+        </p>
+        <hr style="border: none; border-top: 1px solid #d4d8c8; margin: 24px 0;">
+        <p style="color: #7a9396; font-size: 12px;">
+            If you didn't request a password reset, you can safely ignore this email.
+        </p>
+    </div>
+    """
+
+    send_mail(
+        subject="Reset your CartIZ password",
+        message=f"Reset your password here: {reset_url}\n\nThis link expires in 24 hours.",
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[email],
+        html_message=html_message,
+        fail_silently=False,
+    )
+
+

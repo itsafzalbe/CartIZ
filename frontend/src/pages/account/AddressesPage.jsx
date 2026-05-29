@@ -3,7 +3,7 @@ import { getAddresses, createAddress, updateAddress, deleteAddress, setDefaultAd
 import DashboardLayout from '../../components/DashboardLayout'
 
 const EMPTY = {
-  address_type: 'SHIPPING', full_name: '', phone_number: '',
+  address_type: 'shipping', full_name: '', phone_number: '',
   address_line_1: '', address_line_2: '', city: '',
   state_province: '', postal_code: '', country: '', is_default: false,
 }

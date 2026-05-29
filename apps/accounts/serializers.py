@@ -471,10 +471,10 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         uid = urlsafe_base64_encode(force_bytes(self._user.pk))
         token = default_token_generator.make_token(self._user)
         reset_url = (
-            f"{os.environ.get("FRONTEND_URL", 'https://yourapp.com')}"
+            f"{settings.FRONTEND_URL}"
             f"/reset-password?uid={uid}&token={token}"
         )
-        # TODO: send_password_reset_email.delay(self._user.email, reset_url)
+        send_password_reset_email.delay(self._user.email, reset_url)
 
     
 # ─────────────────────────────────────────────────────────────────────────────
@@ -514,6 +514,29 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         return user
 
 
+class EmailExistsSerializer(serializers.Serializer):
+    """
+    Checks whether an email address is already associated with a fully
+    registered account (auth_status == "DONE").
+ 
+    Used by the frontend to give instant feedback on the register form
+    before the user submits — NOT a sensitive endpoint, so it is intentionally
+    limited to DONE accounts only (partial / unverified accounts are invisible).
+    """
+ 
+    email = serializers.EmailField()
+ 
+    def validate_email(self, value: str) -> str:
+        return value.lower().strip()
+ 
+    def check(self) -> bool:
+        email = self.validated_data["email"]
+        return User.objects.filter(
+            email=email,
+            is_email_verified=True,
+            auth_status="DONE",
+        ).exists()
+    
 
 
 
@@ -524,132 +547,131 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
 
 
-
  
 
 
  
  
-# # ─────────────────────────────────────────────────────────────────────────────
-# # Google OAuth helpers
-# # ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Google OAuth helpers
+# ─────────────────────────────────────────────────────────────────────────────
  
-# def _upsert_google_user(data: dict) -> dict:
-#     """
-#     Find-or-create a user from Google profile data and return JWT tokens.
-#     If the email already exists under EMAIL auth we link Google to that
-#     account rather than rejecting, so users can log in with either method.
-#     """
-#     email = data["email"].lower().strip()
+def _upsert_google_user(data: dict) -> dict:
+    """
+    Find-or-create a user from Google profile data and return JWT tokens.
+    If the email already exists under EMAIL auth we link Google to that
+    account rather than rejecting, so users can log in with either method.
+    """
+    email = data["email"].lower().strip()
  
-#     user, created = User.objects.get_or_create(
-#         email=email,
-#         defaults={
-#             "first_name":        data["first_name"],
-#             "last_name":         data["last_name"],
-#             "avatar_url":        data["avatar_url"],
-#             "auth_provider":     User.AuthProvider.GOOGLE,
-#             "is_email_verified": True,
-#             "is_active":         True,
-#             "auth_status":       "DONE",
-#         },
-#     )
+    user, created = User.objects.get_or_create(
+        email=email,
+        defaults={
+            "first_name":        data["first_name"],
+            "last_name":         data["last_name"],
+            "avatar_url":        data["avatar_url"],
+            "auth_provider":     User.AuthProvider.GOOGLE,
+            "is_email_verified": True,
+            "is_active":         True,
+            "auth_status":       "DONE",
+        },
+    )
  
-#     if not created:
-#         update_fields = []
-#         if data["avatar_url"] and not user.avatar:
-#             user.avatar_url = data["avatar_url"]
-#             update_fields.append("avatar_url")
-#         if user.auth_provider != User.AuthProvider.GOOGLE:
-#             user.auth_provider = User.AuthProvider.GOOGLE
-#             update_fields.append("auth_provider")
-#         if update_fields:
-#             user.save(update_fields=update_fields)
+    if not created:
+        update_fields = []
+        if data["avatar_url"] and not user.avatar:
+            user.avatar_url = data["avatar_url"]
+            update_fields.append("avatar_url")
+        if user.auth_provider != User.AuthProvider.GOOGLE:
+            user.auth_provider = User.AuthProvider.GOOGLE
+            update_fields.append("auth_provider")
+        if update_fields:
+            user.save(update_fields=update_fields)
  
-#     return {**_issue_tokens(user), "created": created}
- 
- 
-# # ─────────────────────────────────────────────────────────────────────────────
-# # Google OAuth — SPA / mobile  (client sends ID token directly)
-# # ─────────────────────────────────────────────────────────────────────────────
- 
-# class GoogleOAuthSerializer(serializers.Serializer):
-#     """Validates a Google ID token and creates or logs in the user."""
- 
-#     id_token = serializers.CharField()
- 
-#     def validate_id_token(self, value: str) -> str:
-#         try:
-#             from google.oauth2 import id_token as google_id_token
-#             from google.auth.transport import requests as google_requests
- 
-#             idinfo = google_id_token.verify_oauth2_token(
-#                 value,
-#                 google_requests.Request(),
-#                 os.environ.get("GOOGLE_CLIENT_ID"),
-#             )
-#         except Exception:
-#             raise serializers.ValidationError(
-#                 "Google token is invalid or has expired. Please sign in again."
-#             )
- 
-#         if not idinfo.get("email_verified"):
-#             raise serializers.ValidationError(
-#                 "The Google account's email address is not verified."
-#             )
- 
-#         self._google_data = {
-#             "email":      idinfo["email"],
-#             "first_name": idinfo.get("given_name", ""),
-#             "last_name":  idinfo.get("family_name", ""),
-#             "avatar_url": idinfo.get("picture", ""),
-#         }
-#         return value
- 
-#     def save(self) -> dict:
-#         return _upsert_google_user(self._google_data)
+    return {**_issue_tokens(user), "created": created}
  
  
-# # ─────────────────────────────────────────────────────────────────────────────
-# # Google OAuth — server-side  (backend exchanges authorization code)
-# # ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Google OAuth — SPA / mobile  (client sends ID token directly)
+# ─────────────────────────────────────────────────────────────────────────────
  
-# class GoogleOAuthCallbackSerializer(serializers.Serializer):
-#     """Accepts the authorization code from the consent screen and exchanges it."""
+class GoogleOAuthSerializer(serializers.Serializer):
+    """Validates a Google ID token and creates or logs in the user."""
  
-#     code         = serializers.CharField()
-#     redirect_uri = serializers.CharField()
+    id_token = serializers.CharField()
  
-#     def validate(self, attrs: dict) -> dict:
-#         response = http_requests.post(
-#             "https://oauth2.googleapis.com/token",
-#             data={
-#                 "code":          attrs["code"],
-#                 "client_id":     os.environ.get("GOOGLE_CLIENT_ID"),
-#                 "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
-#                 "redirect_uri":  attrs["redirect_uri"],
-#                 "grant_type":    "authorization_code",
-#             },
-#             timeout=10,
-#         )
+    def validate_id_token(self, value: str) -> str:
+        try:
+            from google.oauth2 import id_token as google_id_token
+            from google.auth.transport import requests as google_requests
  
-#         if response.status_code != 200:
-#             raise serializers.ValidationError(
-#                 "Failed to exchange the authorization code with Google."
-#             )
+            idinfo = google_id_token.verify_oauth2_token(
+                value,
+                google_requests.Request(),
+                os.environ.get("GOOGLE_CLIENT_ID"),
+            )
+        except Exception:
+            raise serializers.ValidationError(
+                "Google token is invalid or has expired. Please sign in again."
+            )
  
-#         id_token_value = response.json().get("id_token")
-#         if not id_token_value:
-#             raise serializers.ValidationError("Google did not return an ID token.")
+        if not idinfo.get("email_verified"):
+            raise serializers.ValidationError(
+                "The Google account's email address is not verified."
+            )
  
-#         inner = GoogleOAuthSerializer(data={"id_token": id_token_value})
-#         inner.is_valid(raise_exception=True)
+        self._google_data = {
+            "email":      idinfo["email"],
+            "first_name": idinfo.get("given_name", ""),
+            "last_name":  idinfo.get("family_name", ""),
+            "avatar_url": idinfo.get("picture", ""),
+        }
+        return value
  
-#         attrs["_google_data"] = inner._google_data
-#         return attrs
+    def save(self) -> dict:
+        return _upsert_google_user(self._google_data)
  
-#     def save(self) -> dict:
-#         return _upsert_google_user(self.validated_data["_google_data"])
+ 
+# ─────────────────────────────────────────────────────────────────────────────
+# Google OAuth — server-side  (backend exchanges authorization code)
+# ─────────────────────────────────────────────────────────────────────────────
+ 
+class GoogleOAuthCallbackSerializer(serializers.Serializer):
+    """Accepts the authorization code from the consent screen and exchanges it."""
+ 
+    code         = serializers.CharField()
+    redirect_uri = serializers.CharField()
+ 
+    def validate(self, attrs: dict) -> dict:
+        response = http_requests.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code":          attrs["code"],
+                "client_id":     os.environ.get("GOOGLE_CLIENT_ID"),
+                "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
+                "redirect_uri":  attrs["redirect_uri"],
+                "grant_type":    "authorization_code",
+            },
+            timeout=10,
+        )
+ 
+        if response.status_code != 200:
+            raise serializers.ValidationError(
+                "Failed to exchange the authorization code with Google."
+            )
+ 
+        id_token_value = response.json().get("id_token")
+        if not id_token_value:
+            raise serializers.ValidationError("Google did not return an ID token.")
+ 
+        inner = GoogleOAuthSerializer(data={"id_token": id_token_value})
+        inner.is_valid(raise_exception=True)
+ 
+        attrs["_google_data"] = inner._google_data
+        return attrs
+ 
+    def save(self) -> dict:
+        return _upsert_google_user(self.validated_data["_google_data"])
 
 
 

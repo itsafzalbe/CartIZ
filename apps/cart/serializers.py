@@ -532,7 +532,7 @@ class MoveToCartSerializer(serializers.Serializer):
     """
 
     wishlist_item_id = serializers.IntegerField()
-    quantity = serializers.IntegerField(default=1, min_vlaue=1)
+    quantity = serializers.IntegerField(default=1, min_value=1)
 
     def validate(self, attrs):
         user = self.context['request'].user
