@@ -14,11 +14,11 @@ from pathlib import Path
 from datetime import timedelta
 from django.conf import settings
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv # pyright: ignore[reportMissingImports]
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
-BASE_DIR = Path(__file__).resolve().parent.parent
+
 
 
 # Quick-start development settings - unsuitable for production
@@ -55,11 +55,13 @@ INSTALLED_APPS = [
     'apps.accounts.apps.AccountsConfig',
     'apps.cart.apps.CartConfig',
     'apps.communications.apps.CommunicationsConfig',
+    'apps.home.apps.HomeConfig',
     'apps.orders.apps.OrdersConfig',
     'apps.payments.apps.PaymentsConfig',
     'apps.products.apps.ProductsConfig',
     'apps.promotions.apps.PromotionsConfig',
     'apps.stores.apps.StoresConfig',
+    
 
 ]
 

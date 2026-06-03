@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { verifyEmail, resendOTP } from '../../api/auth'
-import AuthLayout from '../../components/AuthLayout'
+import AuthLayout from '../../components/auth/AuthLayout'
 import { extractError } from '../../utils/errors'
 
 export default function VerifyEmailPage() {

@@ -4,7 +4,7 @@ import { changePassword } from '../../api/auth'
 import { deleteAccount } from '../../api/account'
 import { useAuth } from '../../hooks/useAuth'
 import DashboardLayout from '../../components/DashboardLayout'
-import PasswordRequirements, { getPasswordRequirements } from '../../components/PasswordRequirements'
+import PasswordRequirements, { getPasswordRequirements } from '../../components/auth/PasswordRequirements'
 
 export default function SecurityPage() {
   const { logout } = useAuth()

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { registerEmail, checkEmailExists } from '../../api/auth'
-import AuthLayout from '../../components/AuthLayout'
-import GoogleIcon from '../../components/GoogleIcon'
+import AuthLayout from '../../components/auth/AuthLayout'
+import GoogleIcon from '../../components/auth/GoogleIcon'
 import { extractError, extractFieldErrors } from '../../utils/errors'
 
 const API_URL = import.meta.env.VITE_API_URL ?? ''

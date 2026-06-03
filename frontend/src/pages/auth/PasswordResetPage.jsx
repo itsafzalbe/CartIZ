@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { passwordResetRequest, passwordResetConfirm } from '../../api/auth'
-import AuthLayout from '../../components/AuthLayout'
-import PasswordRequirements, { getPasswordRequirements } from '../../components/PasswordRequirements'
+import AuthLayout from '../../components/auth/AuthLayout'
+import PasswordRequirements, { getPasswordRequirements } from '../../components/auth/PasswordRequirements'
 import { extractError, extractFieldErrors } from '../../utils/errors'
 
 export default function PasswordResetPage() {

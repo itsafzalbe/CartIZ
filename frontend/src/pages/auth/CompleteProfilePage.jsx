@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { completeProfile } from '../../api/auth'
 import { useAuth } from '../../hooks/useAuth'
-import AuthLayout from '../../components/AuthLayout'
-import PasswordRequirements, { getPasswordRequirements } from '../../components/PasswordRequirements'
+import AuthLayout from '../../components/auth/AuthLayout'
+import PasswordRequirements, { getPasswordRequirements } from '../../components/auth/PasswordRequirements'
 import { extractError, extractFieldErrors } from '../../utils/errors'
 
 // ── Reusable field ─────────────────────────────────────────────────────────

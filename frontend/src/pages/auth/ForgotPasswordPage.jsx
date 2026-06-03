@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import AuthLayout from '../../components/AuthLayout'
-import AuthInput from '../../components/AuthInput'
-import AuthButton from '../../components/AuthButton'
+import AuthLayout from '../../components/auth/AuthLayout'
+import AuthInput from '../../components/auth/AuthInput'
+import AuthButton from '../../components/auth/AuthButton'
 import { passwordResetRequest } from '../../api/auth'
 
 export default function ForgotPasswordPage() {
