@@ -5,6 +5,15 @@
 __pycache__
 db.sqlite3
 media
+.docker/
+.DS_Store
+.env
+.env.*
+frontend/node_modules/
+frontend/dist/
+staticfiles/
+logs/
+*.log
 
 # Backup files # 
 *.bak 
@@ -16,7 +25,7 @@ media
 .idea/**/usage.statistics.xml
 .idea/**/dictionaries
 .idea/**/shelf
-.idea/misc.xml,
+.idea/misc.xml
 .idea/jsLibraryMappings.xml
 
 # AWS User-specific
