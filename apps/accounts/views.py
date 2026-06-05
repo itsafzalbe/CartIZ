@@ -1,32 +1,10 @@
-"""
-views.py — Authentication & account management
-===============================================
-All views follow a consistent response envelope:
-
-  Success 2xx
-  {
-      "status":  "success",
-      "message": "...",
-      "data":    { ... }   ← omitted when there is nothing to return
-  }
-
-  Error 4xx
-  {
-      "status": "error",
-      "errors": { field: [msg, ...], non_field_errors: [...] }
-  }
-"""
-
-
 import os
 import urllib.parse
 
 from django.shortcuts import redirect
 from django.utils import timezone
 
-from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -36,14 +14,11 @@ from .serializers import *
 from apps.utils.response_helpers import *
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
+
 # Custom throttles
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-
 class AuthRateThrottle(AnonRateThrottle):
-    """10 requests / hour for sensitive auth endpoints."""
+    """10 requests / hour"""
     scope = "auth"
     rate = "10/hour"
 
@@ -52,15 +27,12 @@ class OTPRateThrottle(AnonRateThrottle):
     scope = "otp"
     rate = "5/hour"
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # Step 1 — Submit email => tested 
-# ─────────────────────────────────────────────────────────────────────────────
 class RegisterEmailView(APIView):
     """
     POST /auth/register/
     Body: { "email": "user@example.com"}
-    
-    Sends a 5-digit OTP to the provided address
     """
 
     permission_classes = [AllowAny]
@@ -76,16 +48,12 @@ class RegisterEmailView(APIView):
         )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # Step 2 — Verify OTP => tested
-# ─────────────────────────────────────────────────────────────────────────────
 class VerifyEmailView(APIView):
     """
     POST /auth/verify-email/
     Body: { "email": "user@example.com", "code": "12345" }
-    
-    On success advances auth_status to REGISTERED and returns the user_id
-    the client needs for the complete-profile step.
     """
 
     permission_classes = [AllowAny]
@@ -103,17 +71,12 @@ class VerifyEmailView(APIView):
             },
         )
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Resend OTP => tested
-# ─────────────────────────────────────────────────────────────────────────────
 
+# Resend OTP => tested
 class ResendOTPView(APIView):
     """
     POST /auth/resend-otp/
     Body: { "email": "user@example.com" }
-
-    60-second cooldown enforced. Returns seconds_remaining so the frontend
-    can display a countdown timer. 
     """
 
     permission_classes = [AllowAny]
@@ -129,17 +92,12 @@ class ResendOTPView(APIView):
         )
     
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Step 3 — Complete profile => tested
-# ─────────────────────────────────────────────────────────────────────────────
 
+# Step 3 — Complete profile => tested
 class CompleteProfileView(APIView):
     """
     PATCH /auth/complete-profile/<user_id>/
     Body: { "username", "first_name", "last_name", "password", "password_confirm", ... }
-    
-    Finalises registration (auth_status → DONE) and immediately issues
-    JWT tokens so the user lands on the dashboard without a second login.
     """
 
     permission_classes = [AllowAny]
@@ -172,14 +130,12 @@ class CompleteProfileView(APIView):
         )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # Login => tested
-# ─────────────────────────────────────────────────────────────────────────────
 class LoginView(APIView):
     """
     POST /auth/login/
     Body: { "email": "user@example.com", "password": "SecretPassword123!" }
-    Return access + refresh JWT tokens. Also captures the client IP for audit purpose.
     """
     permission_classes = [AllowAny]
     throttle_classes = [AuthRateThrottle]
@@ -215,16 +171,11 @@ class LoginView(APIView):
         )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Logout => tested
-# ─────────────────────────────────────────────────────────────────────────────
 class LogoutView(APIView):
     """
     POST /auth/logout/
     Body: { "refresh": "<refresh_token>" }
-    
-    Blacklist the refresh token. The short-lived access token will expire
-    on its own; frontends should discard it immediately
     """
 
     permission_classes = [IsAuthenticated]
@@ -237,16 +188,11 @@ class LogoutView(APIView):
         return ok("Logged out successfully.")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Token refresh => tested
-# ─────────────────────────────────────────────────────────────────────────────
-
 class TokenRefreshView(APIView):
     """
     POST /auth/token/refresh/
     Body: { "refresh": <refresh_token> }
-    
-    Returns a new access token (and rotated refresh if configured).
     """
 
     permission_classes = [AllowAny]
@@ -257,9 +203,8 @@ class TokenRefreshView(APIView):
         return ok("Token refreshed.", data=serializer.get_tokens())
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # Password — change => tested
-# ─────────────────────────────────────────────────────────────────────────────
 class PasswordChangeView(APIView):
     """
     POST /auth/password/change/
@@ -275,15 +220,12 @@ class PasswordChangeView(APIView):
         return ok("Password changed successfully.")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # Password — reset request => not tested
-# ─────────────────────────────────────────────────────────────────────────────
 class PasswordResetRequestView(APIView):
     """
     POST /auth/password/reset/
     Body: { "email": "user@example.com" }
-    
-    Always 200 - the client cannot tell whether the address exists.
     """
 
     permission_classes = [AllowAny]
@@ -298,10 +240,7 @@ class PasswordResetRequestView(APIView):
         )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Password — reset confirm => not tested
-# ─────────────────────────────────────────────────────────────────────────────
-
 class PasswordResetConfirmView(APIView):
     """
     POST /auth/password/reset/confirm/
@@ -321,13 +260,7 @@ class PasswordResetConfirmView(APIView):
 class EmailExistsView(APIView):
     """
     GET /auth/email-exists/?email=user@example.com
- 
-    Returns { "exists": true/false } indicating whether the address belongs
-    to a fully registered account. Always 200 — the boolean does the work.
- 
-    Intentionally uses a loose throttle; this is a read-only helper and the
-    response reveals nothing beyond what the register endpoint already tells
-    the user on submit.
+    Returns { "exists": true/false }
     """
  
     permission_classes = [AllowAny]
@@ -364,17 +297,11 @@ class EmailExistsView(APIView):
 
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Google OAuth — SPA / mobile
-# ─────────────────────────────────────────────────────────────────────────────
-
 class GoogleOAuthView(APIView):
     """
     POST /auth/google/
     Body: { "id_token": "<google_id_token>" }
-
-    For React Native / SPA clients that handle the Google sign-in flow
-    themselves and send the resulting ID token to the backend.
     """
     permission_classes = [AllowAny]
 
@@ -389,16 +316,10 @@ class GoogleOAuthView(APIView):
         return ok(message, data=result, http_status=http_status)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Google OAuth — server-side redirect
-# ─────────────────────────────────────────────────────────────────────────────
-
 class GoogleOAuthRedirectView(APIView):
     """
     GET /auth/google/redirect/
-
-    Builds the Google consent URL and redirects the browser.
-    Use this for traditional server-rendered or backend-driven OAuth flows.
     """
     permission_classes = [AllowAny]
 
@@ -420,8 +341,6 @@ class GoogleOAuthCallbackView(APIView):
     """
     POST /auth/google/callback/
     Body: { "code": "<auth_code>", "redirect_uri": "..." }
-
-    The frontend/backend POSTs here after Google redirects back with a code.
     """
     permission_classes = [AllowAny]
 

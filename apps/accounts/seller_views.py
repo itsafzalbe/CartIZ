@@ -1,17 +1,3 @@
-"""
-Seller views — backed by the Market model.
-Replace the 5 SellerProfile-based views in accounts/views.py with these.
-
-Also update the seller view imports at the top of accounts/views.py:
-  from .seller_serializers import (
-      BecomeSellerSerializer,
-      SellerProfileSerializer,
-      SellerProfileUpdateSerializer,
-      SellerPublicSerializer,
-      SellerStatsSerializer,
-  )
-"""
-
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -24,10 +10,8 @@ from .seller_serializers import *
 
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Helper functions
-# ═════════════════════════════════════════════════════════════════════════════
 
+# Helper functions
 def success(message: str, data: dict = None, http_status=status.HTTP_200_OK) -> Response:
     body = {"status": "success", "message": message}
     if data is not None:

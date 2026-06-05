@@ -1,19 +1,3 @@
-"""
-cart/serializers.py
-====================
-Cart           (4)  CartSerializer, CartDetailSerializer,
-                    CartSummarySerializer, CartItemCountSerializer
-Cart Items     (14) CartItemSerializer, CartItemCreateSerializer,
-                    CartItemUpdateSerializer, CartItemDeleteSerializer,
-                    CartItemListSerializer, CartItemDetailSerializer,
-                    AddToCartSerializer, UpdateCartQuantitySerializer,
-                    ClearCartSerializer, CartItemBulkUpdateSerializer,
-                    CartItemBulkDeleteSerializer, MoveToWishlistSerializer,
-                    SaveForLaterSerializer, MoveToCartSerializer
-Cart Operations(4)  ApplyCouponToCartSerializer, RemoveCouponFromCartSerializer,
-                    CalculateShippingForCartSerializer, CartValidationSerializer
-"""
-
 from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone

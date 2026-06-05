@@ -3,9 +3,8 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
-from rest_framework import status
+
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Order, OrderAddress, OrderItem, OrderShipping, ShippingMethod
@@ -702,3 +701,5 @@ class CalculateShippingCostView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         return ok("Shipping options calculated.", data=serializer.calculate())
+    
+    

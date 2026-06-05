@@ -1,31 +1,3 @@
-"""
-serializers.py — Authentication & account management
-=====================================================
-Registration flow  (3 steps, tracked via auth_status):
-  Step 1  POST /auth/register/              email → OTP sent          (NEW)
-  Step 2  POST /auth/verify-email/          OTP  → email confirmed    (NEW → REGISTERED)
-  Step 3  PATCH /auth/complete-profile/     profile + password set    (REGISTERED → DONE)
- 
-OTP resend:
-  POST /auth/resend-otp/   allowed once per 60 s; max 5 attempts per session.
- 
-Session:
-  POST /auth/login/
-  POST /auth/logout/
-  POST /auth/token/refresh/
- 
-Password:
-  POST /auth/password/change/
-  POST /auth/password/reset/
-  POST /auth/password/reset/confirm/
- 
-Google OAuth (two flows):
-  POST /auth/google/           — SPA / mobile (send ID token directly)
-  POST /auth/google/callback/  — server-side (exchange authorization code)
-"""
-
-
-
 import os
 import requests as http_requests
 from django.contrib.auth.tokens import default_token_generator
@@ -39,8 +11,7 @@ from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
-from datetime import timedelta
-import uuid
+
 from .utils import *
 
 from .models import User, EmailVerification, UserAddress
@@ -50,11 +21,8 @@ from .models import User, EmailVerification, UserAddress
 OTP_RESEND_COOLDOWN_SECONDS = 60
 OTP_MAX_RESENDS = 5
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # Shared helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
-
 def _issue_tokens(user: User) -> dict:
     # returns a fresh JWT access + refresh pair for *user*
 
@@ -106,11 +74,8 @@ def _get_own_address(user: User, address_id: int) -> UserAddress:
 
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # Step 1 — Submit email  (auth_status stays NEW)
-# ─────────────────────────────────────────────────────────────────────────────
-
-
 class UserRegistrationSerializer(serializers.Serializer):
     """
     Accepts an email address and fires an OTP
@@ -150,11 +115,7 @@ class UserRegistrationSerializer(serializers.Serializer):
         return user
     
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Step 2 — Verify OTP  (auth_status: NEW → REGISTERED)
-# ─────────────────────────────────────────────────────────────────────────────
-
-
 class EmailVerificationSerializer(serializers.Serializer):
     """ 
     Verifies the 5 digit OTP
@@ -209,11 +170,7 @@ class EmailVerificationSerializer(serializers.Serializer):
 
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Resend OTP
-# ─────────────────────────────────────────────────────────────────────────────
-
-
 class ResendVerificationEmailSerializer(serializers.Serializer):
     """
     Resends the OTP under these rule:
@@ -257,9 +214,7 @@ class ResendVerificationEmailSerializer(serializers.Serializer):
         
  
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Step 3 — Complete profile  (auth_status: REGISTERED → DONE)
-# ─────────────────────────────────────────────────────────────────────────────
 class CompleteProfileSerializer(serializers.ModelSerializer):
     """
     Collects remaining profile fields + password
@@ -305,10 +260,7 @@ class CompleteProfileSerializer(serializers.ModelSerializer):
 
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Login
-# ─────────────────────────────────────────────────────────────────────────────
-
 class UserLoginSerializer(serializers.Serializer):
     """
     Validates email + password and returns JWT tokens
@@ -373,9 +325,7 @@ class UserLoginSerializer(serializers.Serializer):
 
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Logout
-# ─────────────────────────────────────────────────────────────────────────────
 class UserLogoutSerializer(serializers.Serializer):
     """Blacklist the refresh token to invalidate the session."""
 
@@ -392,9 +342,8 @@ class UserLogoutSerializer(serializers.Serializer):
         self._token.blacklist()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # Token refresh
-# ─────────────────────────────────────────────────────────────────────────────
 class RefreshTokenSerializer(serializers.Serializer):
     """
     Returns a fresh access token.
@@ -418,10 +367,7 @@ class RefreshTokenSerializer(serializers.Serializer):
         }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Password — change (requires authentication)
-# ─────────────────────────────────────────────────────────────────────────────
-
 class PasswordChangeSerializer(serializers.Serializer):
     """Changes the password for the currently authenticated user."""
     old_password = serializers.CharField(write_only=True)
@@ -449,10 +395,8 @@ class PasswordChangeSerializer(serializers.Serializer):
         user.save()
         return user
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Password — reset request (unauthenticated)
-# ─────────────────────────────────────────────────────────────────────────────
 
+# Password — reset request (unauthenticated)
 class PasswordResetRequestSerializer(serializers.Serializer):
     """Email a reset link to the provided address.
     Always returns 200 ot prevent user enumeration
@@ -477,9 +421,7 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         send_password_reset_email.delay(self._user.email, reset_url)
 
     
-# ─────────────────────────────────────────────────────────────────────────────
 # Password — reset confirm (unauthenticated)
-# ─────────────────────────────────────────────────────────────────────────────
 class PasswordResetConfirmSerializer(serializers.Serializer):
     """Validates the uid + token from the reset link and sets a new password."""
 
@@ -551,11 +493,8 @@ class EmailExistsSerializer(serializers.Serializer):
 
 
  
- 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # Google OAuth helpers
-# ─────────────────────────────────────────────────────────────────────────────
- 
 def _upsert_google_user(data: dict) -> dict:
     """
     Find-or-create a user from Google profile data and return JWT tokens.
@@ -591,10 +530,7 @@ def _upsert_google_user(data: dict) -> dict:
     return {**_issue_tokens(user), "created": created}
  
  
-# ─────────────────────────────────────────────────────────────────────────────
-# Google OAuth — SPA / mobile  (client sends ID token directly)
-# ─────────────────────────────────────────────────────────────────────────────
- 
+# Google OAuth — SPA / mobile  (client sends ID token directly) 
 class GoogleOAuthSerializer(serializers.Serializer):
     """Validates a Google ID token and creates or logs in the user."""
  
@@ -632,10 +568,7 @@ class GoogleOAuthSerializer(serializers.Serializer):
         return _upsert_google_user(self._google_data)
  
  
-# ─────────────────────────────────────────────────────────────────────────────
-# Google OAuth — server-side  (backend exchanges authorization code)
-# ─────────────────────────────────────────────────────────────────────────────
- 
+# Google OAuth — server-side  (backend exchanges authorization code) 
 class GoogleOAuthCallbackSerializer(serializers.Serializer):
     """Accepts the authorization code from the consent screen and exchanges it."""
  
@@ -709,10 +642,7 @@ class GoogleOAuthCallbackSerializer(serializers.Serializer):
 
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # USER PROFILE
-# ═════════════════════════════════════════════════════════════════════════════
-
 class UserProfileSerializer(serializers.ModelSerializer):
     """Read-only view of the authenticated user's own basic profile.
     Returned on GET /accounts/me
@@ -977,10 +907,8 @@ class UserActivitySerializer(serializers.Serializer):
 # # SetDefaultAddressSerializer - Sets address as default for shipping/billing
 
 
-# # ═════════════════════════════════════════════════════════════════════════════
-# # USER ADDRESSES
-# # ═════════════════════════════════════════════════════════════════════════════
 
+# # USER ADDRESSES
 class UserAddressSerializer(serializers.ModelSerializer):
     """
     Full address detail. 

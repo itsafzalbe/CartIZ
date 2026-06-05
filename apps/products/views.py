@@ -8,13 +8,12 @@ Permissions:
     IsAdminUser         - category/attribute management
 """
 
-from django.db.models import Q, Count, Avg
+from django.db.models import Q, Count
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
+
 
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
-from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import *
