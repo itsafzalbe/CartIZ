@@ -1,22 +1,3 @@
-"""
-products/serializers.py
-========================
-Categories          (8)
-Products            (17)
-Product Stock       (3)
-Product Images      (7)
-Product Variants    (6)
-Product Attributes  (8)
-Product Reviews     (9)
-Wishlist            (7)
-Wishlist Items      (6)
-Product Discovery   (8)
-Product Browsing    (7)
-Product Filtering   (12)
-Personalization     (6)
-Product Comparison  (3)
-"""
-
 from decimal import Decimal
 from django.db.models import Avg, Count, Q, Min, Max
 from django.utils import timezone
@@ -32,7 +13,9 @@ def _primary_image(product: Product) -> str | None:
     img = product.product_images.filter(is_primary=True).first()
     if not img:
         img = product.product_images.first()
-    return img.image_url if img else None
+    if img and img.image:
+        return img.image.url
+    return None
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -288,7 +271,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
-            'id', 'name', 'slug', 'decription', 'short_description', 
+            'id', 'name', 'slug', 'description', 'short_description', 
             'sku', 'barcode', 'price', 'compare_at_price', 'cost_price', 
             'discount_percentage', 'stock_quantity', 'in_stock', 
             'is_low_stock', 'weight', 'dimensions', 'is_featured', 'is_active', 'is_digital',
@@ -374,7 +357,7 @@ class ProductSellerSerializer(serializers.ModelSerializer):
     GET /products/my-products/
     """
     primary_image = serializers.SerializerMethodField()
-    is_low_stcok = serializers.ReadOnlyField()
+    is_low_stock = serializers.ReadOnlyField()
 
     class Meta:
         model = Product
@@ -385,7 +368,7 @@ class ProductSellerSerializer(serializers.ModelSerializer):
             'review_count', 'sold_count', 'view_count', 'is_active', 
             'is_featured', 'primary_image', 'created_at',
         ]
-        read_only_fileds = fields
+        read_only_fields = fields
     
     def get_primary_image(self, obj):
         return _primary_image(obj)
@@ -869,7 +852,7 @@ class ProductAttributeValueCreateSerializer(serializers.ModelSerializer):
     """Adds a new value to an attribute"""
 
     class Meta:
-        model = ProductAttribute
+        model = ProductAttributeValue
         fields = ['value', 'color_code']
         extra_kwargs = {'value': {'required': True}}
 
@@ -879,15 +862,15 @@ class ProductAttributeValueCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("This value already exists for this attribute.")
         return value
     
-    def create(self, validated_date):
+    def create(self, validated_data):
         return ProductAttributeValue.objects.create(
-            attribute=self.context['attribute'], **validated_date
+            attribute=self.context['attribute'], **validated_data
         )
 
 class ProductAttributeValueListSerializer(serializers.ModelSerializer):
     """All value for a given attribute"""
     class Meta:
-        model = ProductAttribute
+        model = ProductAttributeValue
         fields = ['id', 'value', 'color_code']
         read_only_fields = fields
 
@@ -1276,7 +1259,7 @@ class NewArrivalsSerializer(serializers.ModelSerializer):
         return _primary_image(obj)
 
 class BestSellersSerializer(serializers.ModelSerializer):
-    prrimary_image = serializers.SerializerMethodField()
+    primary_image = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -1304,7 +1287,7 @@ class SimilarProductsSerializer(serializers.ModelSerializer):
 class FrequentlyBoughtTogetherSerializer(serializers.ModelSerializer):
     """Products often ordered together - placeholder until analytics data exists"""
 
-    primar_image = serializers.SerializerMethodField()
+    primary_image = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -1450,11 +1433,11 @@ class ProductFilterSerializer(serializers.Serializer):
     """Input serializer - validates the filter params from query string."""
     q               = serializers.CharField(required=False, allow_blank=True)
     category        = serializers.IntegerField(required=False)
-    min_prict       = serializers.DecimalField(required=False, max_digits=10, decimal_places=2)
-    max_prict       = serializers.DecimalField(required=False, max_digits=10, decimal_places=2)
+    min_price       = serializers.DecimalField(required=False, max_digits=10, decimal_places=2)
+    max_price       = serializers.DecimalField(required=False, max_digits=10, decimal_places=2)
     min_rating      = serializers.DecimalField(required=False, max_digits=3, decimal_places=2)
-    in_stock        = serializers.BooleanField(required=False)
-    is_featured     = serializers.BooleanField(required=False)
+    in_stock = serializers.BooleanField(required=False, allow_null=True)
+    is_featured = serializers.BooleanField(required=False, allow_null=True)
     market          = serializers.IntegerField(required=False)
     sort            = serializers.ChoiceField(
         required=False,
@@ -1463,8 +1446,8 @@ class ProductFilterSerializer(serializers.Serializer):
 
 class PriceRangeFilterSerializer(serializers.Serializer):
     """Filter by price range."""
-    min_prict = serializers.DecimalField(required=True, max_digits=10, decimal_places=2)
-    max_prict = serializers.DecimalField(required=True, max_digits=10, decimal_places=2)
+    min_price = serializers.DecimalField(required=True, max_digits=10, decimal_places=2)
+    max_price = serializers.DecimalField(required=True, max_digits=10, decimal_places=2)
 
     def validate(self, attrs):
         if attrs['min_price'] > attrs['max_price']:
@@ -1668,7 +1651,7 @@ class ProductCompareSerializer(serializers.ModelSerializer):
         return _primary_image(obj)
     
 
-    def get_attribute(self, obj):
+    def get_attributes(self, obj):
         """Flatten variant attribute into a unified dict for comparison"""
         attrs = {}
         for variant in obj.product_variants.filter(is_active=True):

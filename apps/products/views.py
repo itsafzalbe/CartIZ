@@ -1,13 +1,3 @@
-"""
-products/views.py
-=================
-Permissions:
-    AllowAny            - public product/category browsing
-    IsAuthenticated     - reviews, wishlists
-    IsSellerOnly        - create/update/delete own products
-    IsAdminUser         - category/attribute management
-"""
-
 from django.db.models import Q, Count
 from django.shortcuts import get_object_or_404
 
@@ -239,9 +229,9 @@ class ProductDetailView(APIView):
         product = self._get(slug)
         if product.market.seller_id != request.user.pk:
             return forbidden("You do not own this product.")
-            s = ProductUpdateSerializer(product, data=request.data, partial=True)
-            s.is_valid(raise_exception=True)
-            return ok("Product updated.", data=ProductDetailSerializer(s.save()).data)
+        s = ProductUpdateSerializer(product, data=request.data, partial=True)
+        s.is_valid(raise_exception=True)
+        return ok("Product updated.", data=ProductDetailSerializer(s.save()).data)
         
     def delete(self, request, slug):
         product = self._get(slug)
